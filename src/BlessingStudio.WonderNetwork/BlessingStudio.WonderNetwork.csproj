@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;netstandard2.1;net6.0;net7.0</TargetFrameworks>
+	<LangVersion>11</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BlessingStudio.WonderNetwork</Title>
+    <Authors>Ddggdd135;Xilu</Authors>
+    <Company>BlessingStudio</Company>
+    <Version>0.0.1</Version>
+  </PropertyGroup>
+
+</Project>
