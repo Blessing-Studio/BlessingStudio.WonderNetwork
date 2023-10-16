@@ -18,7 +18,7 @@ namespace BlessingStudio.WonderNetwork
         {
             return !(left == right);
         }
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             if(obj is Channel other)
             {
