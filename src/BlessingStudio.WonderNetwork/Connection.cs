@@ -23,6 +23,7 @@ namespace BlessingStudio.WonderNetwork
         public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
         public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
         public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
+        public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
         public Connection(NetworkStream networkStream)
         {
             this.networkStream = networkStream;
@@ -97,6 +98,10 @@ namespace BlessingStudio.WonderNetwork
                     networkStream.WriteByte((byte)PacketType.DestroyChannel);
                     channels.Remove(name);
                 }
+                if (ChannelDeleted != null)
+                {
+                    ChannelDeleted(new(name, this));
+                }
             }
         }
 
@@ -151,6 +156,10 @@ namespace BlessingStudio.WonderNetwork
                                 if (connection.channels.Contains(name))
                                 {
                                     connection.channels.Remove(name);
+                                    if(connection.ChannelDeleted != null)
+                                    {
+                                        connection.ChannelDeleted(new(name, connection));
+                                    }
                                 }
                             }
                             break;
