@@ -10,12 +10,13 @@ namespace SendingTest
         [SetUp]
         public void Setup()
         {
-            TcpListener tcpListener = new(25301);
+            int port = new Random().Next(10000, 50000);
+            TcpListener tcpListener = new(port);
             tcpListener.Start();
             Task.Run(() =>
             {
                 TcpClient tcpClient = new TcpClient();
-                tcpClient.Connect("localhost", 25301);
+                tcpClient.Connect("localhost", port);
                 ServerConnection = new(tcpClient.GetStream());
             });
             TcpClient tcpClient = tcpListener.AcceptTcpClient();
@@ -30,12 +31,52 @@ namespace SendingTest
 
             ServerConnection.ReceivedBytes += (e) =>
             {
-                if(e.Data == bytes)
-                pass = true;
+                bool equal = bytes.Length == e.Data.Length;
+                if (equal)
+                {
+                    for (int i = 0; i < bytes.Length; i++)
+                    {
+                        if (bytes[i] != e.Data[i])
+                        {
+                            equal = false;
+                            break;
+                        }
+                    }
+                }
+                pass = equal;
             };
             Channel channel = ClientConnection.CreateChannel("master");
             channel.Send(bytes);
-            Thread.Sleep(5000);
+            Thread.Sleep(100);
+            if (pass)
+            {
+                Assert.Pass();
+            }
+            else
+            {
+                Assert.Fail();
+            }
+        }
+        [Test]
+        public void ObjectSendingTest()
+        {
+            bool pass = false;
+            Class1 class1 = new Class1()
+            {
+                Property1 = "hello",
+                Property2 = " ",
+                field1 = "",
+                field2 = ", world"
+            };
+            ServerConnection.ReceivedObject += (e) =>
+            {
+                pass = class1.Equals(e.Object);
+            };
+            ServerConnection.Serilizers[typeof(Class1)] = new Class1Serilizer();
+            ClientConnection.Serilizers[typeof(Class1)] = new Class1Serilizer();
+            Channel channel = ClientConnection.CreateChannel("master");
+            channel.Send(class1);
+            Thread.Sleep(100);
             if (pass)
             {
                 Assert.Pass();

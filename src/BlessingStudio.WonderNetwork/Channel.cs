@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace BlessingStudio.WonderNetwork
@@ -38,6 +39,10 @@ namespace BlessingStudio.WonderNetwork
         public void Send(byte[] data)
         {
             Connection.Send(ChannelName, data);
+        }
+        public void Send<T>(T @object)
+        {
+            Connection.Send(ChannelName, @object);
         }
     }
 }

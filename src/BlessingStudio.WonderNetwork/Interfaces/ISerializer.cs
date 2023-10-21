@@ -4,11 +4,11 @@ using System.Text;
 
 namespace BlessingStudio.WonderNetwork.Interfaces
 {
-    public interface ISerilizer
+    public interface ISerializer
     {
 
     }
-    public interface ISerilizer<T> : ISerilizer
+    public interface ISerializer<T> : ISerializer
     {
         public T Deserialize(byte[] data);
         public byte[] Serialize(T @object);

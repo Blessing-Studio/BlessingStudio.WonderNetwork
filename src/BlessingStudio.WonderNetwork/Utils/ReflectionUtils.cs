@@ -8,20 +8,26 @@ namespace BlessingStudio.WonderNetwork.Utils
 {
     public static class ReflectionUtils
     {
-        public static object Deserilize(Type type, ISerilizer serilizer, byte[] data)
+        public static object Deserilize(Type type, ISerializer serilizer, byte[] data)
         {
             Type serilizerType = serilizer.GetType();
-            if (serilizerType.GenericTypeArguments.Length == 1)
+            Type interfaceType = serilizerType.GetInterfaces().FirstOrDefault(t=>t.GUID == typeof(ISerializer<>).GUID);
+            if (interfaceType.GenericTypeArguments.Length == 1)
             {
-                Type genericType = serilizerType.GenericTypeArguments[0];
+                Type genericType = interfaceType.GenericTypeArguments[0];
                 if(type == genericType || type.IsSubclassOf(genericType))
                 {
-                    MethodInfo methodInfo = serilizerType.GetMethod("Deserilize")!;
+                    MethodInfo methodInfo = interfaceType.GetMethod("Deserialize")!;
                     return methodInfo.Invoke(serilizer, new object[] { data })!;
                 }
                 throw new InvalidOperationException("Type is not the type or subclass in serilize");
             }
             throw new InvalidOperationException("Serilizer Error");
+        }
+        public static Type? GetType(string name)
+        {
+            var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            return allAssemblies.Select(assembly => assembly.GetType(name)).FirstOrDefault(assembly => assembly != null);
         }
     }
 }

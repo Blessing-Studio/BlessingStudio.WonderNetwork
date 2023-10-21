@@ -18,7 +18,7 @@ namespace BlessingStudio.WonderNetwork
         private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
         public object sendingLock = new object();
         private List<string> channels = new List<string>();
-        public Dictionary<Type, ISerilizer> Serilizers { get; private set; } = new();
+        public Dictionary<Type, ISerializer> Serilizers { get; private set; } = new();
         public bool IsDisposed { get; private set; }
         public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
         public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
@@ -51,7 +51,7 @@ namespace BlessingStudio.WonderNetwork
             Type type = typeof(T);
             if (Serilizers.ContainsKey(type))
             {
-                ISerilizer<T> serilizer = (ISerilizer<T>)Serilizers[type];
+                ISerializer<T> serilizer = (ISerializer<T>)Serilizers[type];
                 byte[] buffer = serilizer.Serialize(data);
                 lock (sendingLock)
                 {
@@ -174,14 +174,14 @@ namespace BlessingStudio.WonderNetwork
                                 int length = networkStream.ReadVarInt();
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
-                                Type? type = Type.GetType(typeName);
+                                Type? type = ReflectionUtils.GetType(typeName);
                                 if(type == null)
                                 {
                                     break;
                                 }
                                 if(connection.Serilizers[type] != null)
                                 {
-                                    ISerilizer serilizer = connection.Serilizers[type];
+                                    ISerializer serilizer = connection.Serilizers[type];
                                     object @object = ReflectionUtils.Deserilize(type, serilizer, data);
                                     if(connection.ReceivedObject != null)
                                     {
