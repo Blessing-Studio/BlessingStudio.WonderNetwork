@@ -5,6 +5,10 @@ VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BlessingStudio.WonderNetwork", "BlessingStudio.WonderNetwork\BlessingStudio.WonderNetwork.csproj", "{D5E3117C-FFDB-4036-A821-C7F6ADDE1C56}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{C6A56379-B853-4E49-B827-695153EE32B8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SendingTest", "..\tests\SendingTest\SendingTest.csproj", "{639CE3FB-917C-46CC-9620-4427C4BF0AE9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,9 +19,16 @@ Global
 		{D5E3117C-FFDB-4036-A821-C7F6ADDE1C56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D5E3117C-FFDB-4036-A821-C7F6ADDE1C56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D5E3117C-FFDB-4036-A821-C7F6ADDE1C56}.Release|Any CPU.Build.0 = Release|Any CPU
+		{639CE3FB-917C-46CC-9620-4427C4BF0AE9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{639CE3FB-917C-46CC-9620-4427C4BF0AE9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{639CE3FB-917C-46CC-9620-4427C4BF0AE9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{639CE3FB-917C-46CC-9620-4427C4BF0AE9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{639CE3FB-917C-46CC-9620-4427C4BF0AE9} = {C6A56379-B853-4E49-B827-695153EE32B8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {E2D19780-F7A9-4103-9A3E-74FBFC9351F7}

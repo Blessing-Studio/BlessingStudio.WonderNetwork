@@ -77,6 +77,7 @@ namespace BlessingStudio.WonderNetwork
             lock (sendingLock)
             {
                 networkStream.WriteByte((byte)PacketType.CreateChannel);
+                networkStream.WriteString(name);
                 channels.Add(name);
                 if(ChannelCreated != null)
                 {
