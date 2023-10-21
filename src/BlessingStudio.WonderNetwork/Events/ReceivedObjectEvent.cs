@@ -5,16 +5,16 @@ using System.Text;
 
 namespace BlessingStudio.WonderNetwork.Events
 {
-    public class ReceivedEvent : IEvent
+    public class ReceivedObjectEvent : IEvent
     {
         public Channel Channel { get; private set; }
         public IConnection Connection { get; private set; }
-        public byte[] Data { get; private set; }
-        public ReceivedEvent(Channel channel, IConnection connection, byte[] data)
+        public object Object {  get; private set; }
+        public ReceivedObjectEvent(Channel channel, IConnection connection, object @object)
         {
             Channel = channel;
             Connection = connection;
-            Data = data;
+            Object = @object;
         }
     }
 }
