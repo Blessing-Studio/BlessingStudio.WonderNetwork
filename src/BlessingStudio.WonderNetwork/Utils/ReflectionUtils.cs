@@ -11,7 +11,10 @@ namespace BlessingStudio.WonderNetwork.Utils
         public static object Deserilize(Type type, ISerializer serilizer, byte[] data)
         {
             Type serilizerType = serilizer.GetType();
-            Type interfaceType = serilizerType.GetInterfaces().FirstOrDefault(t=>t.GUID == typeof(ISerializer<>).GUID);
+            Type interfaceType = serilizerType.GetInterfaces().FirstOrDefault(t =>
+            {
+                return t.GetGenericTypeDefinition() == typeof(ISerializer<>);
+            });
             if (interfaceType.GenericTypeArguments.Length == 1)
             {
                 Type genericType = interfaceType.GenericTypeArguments[0];
