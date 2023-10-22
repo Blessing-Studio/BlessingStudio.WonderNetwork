@@ -4,9 +4,9 @@ using System.Text;
 
 namespace BlessingStudio.WonderNetwork.Interfaces
 {
-    public interface IHandler<T>
+    public interface IHandler
     {
-        public void OnChannelRead(Channel channel, T @object);
-        public void OnChannelWrite(Channel channel, T @object);
+        public void OnChannelRead(Channel channel, object @object);
+        public void OnChannelWrite(Channel channel, object @object);
     }
 }
