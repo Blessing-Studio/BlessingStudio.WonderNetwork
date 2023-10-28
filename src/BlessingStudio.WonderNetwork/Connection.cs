@@ -14,7 +14,7 @@ namespace BlessingStudio.WonderNetwork
 {
     public class Connection : IConnection, IEnumerable<Channel>
     {
-        private NetworkStream networkStream;
+        private Stream networkStream;
         private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
         public object sendingLock = new object();
         private List<string> channels = new List<string>();
@@ -24,7 +24,7 @@ namespace BlessingStudio.WonderNetwork
         public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
         public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
         public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
-        public Connection(NetworkStream networkStream)
+        public Connection(Stream networkStream)
         {
             this.networkStream = networkStream;
             ReceivingThread.Start(this);
@@ -40,6 +40,7 @@ namespace BlessingStudio.WonderNetwork
                     networkStream.WriteString(channelName);
                     networkStream.WriteVarInt(data.Length);
                     networkStream.Write(data);
+                    networkStream.Flush();
                 }
             }
         }
@@ -61,6 +62,7 @@ namespace BlessingStudio.WonderNetwork
                     networkStream.WriteString(type.FullName!);
                     networkStream.WriteVarInt(buffer.Length);
                     networkStream.Write(buffer);
+                    networkStream.Flush();
                 }
             }
             else
@@ -79,6 +81,7 @@ namespace BlessingStudio.WonderNetwork
             {
                 networkStream.WriteByte((byte)PacketType.CreateChannel);
                 networkStream.WriteString(name);
+                networkStream.Flush();
                 channels.Add(name);
                 if(ChannelCreated != null)
                 {
@@ -103,6 +106,7 @@ namespace BlessingStudio.WonderNetwork
                     ChannelDeleted(new(name, this));
                 }
             }
+            networkStream.Flush();
         }
 
         public Channel GetChannel(string name)
@@ -128,7 +132,7 @@ namespace BlessingStudio.WonderNetwork
         public static void Listening(object? arg)
         {
             Connection connection = (Connection)arg!;
-            NetworkStream networkStream = connection.networkStream;
+            Stream networkStream = connection.networkStream;
             try
             {
             while (true)
@@ -169,11 +173,13 @@ namespace BlessingStudio.WonderNetwork
                                 int length = networkStream.ReadVarInt();
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
-                                ReceivedBytesEvent @event = new(connection.GetChannel(name), connection, data);
+                                Channel channel = connection.GetChannel(name);
+                                ReceivedBytesEvent @event = new(channel, connection, data);
                                 if (connection.ReceivedBytes != null)
                                 {
                                     connection.ReceivedBytes(@event);
                                 }
+                                channel.OnReceive(data);
                             }
                             break;
                         case PacketType.SendChannelObjectData:
@@ -192,9 +198,10 @@ namespace BlessingStudio.WonderNetwork
                                 {
                                     ISerializer serilizer = connection.Serilizers[type];
                                     object @object = ReflectionUtils.Deserilize(type, serilizer, data);
+                                    Channel channel = connection.GetChannel(typeName);
                                     if(connection.ReceivedObject != null)
                                     {
-                                        connection.ReceivedObject(new(connection.GetChannel(name), connection, @object));
+                                        connection.ReceivedObject(new(channel, connection, @object));
                                     }
                                 }
                             }

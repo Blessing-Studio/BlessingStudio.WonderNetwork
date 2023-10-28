@@ -1,26 +1,31 @@
 using BlessingStudio.WonderNetwork;
+using BlessingStudio.WonderNetwork.Threading;
 using System.Net.Sockets;
 
 namespace SendingTest
 {
-    public class Tests
+    public class UDPTests
     {
         public Connection ServerConnection;
         public Connection ClientConnection;
+        UdpClient udpClient;
+        UdpClient udpServer;
+        UDPReceiver sreceiver;
         [SetUp]
         public void Setup()
         {
             int port = new Random().Next(10000, 50000);
-            TcpListener tcpListener = new(port);
-            tcpListener.Start();
-            Task.Run(() =>
+            udpServer = new UdpClient(port);
+            sreceiver = new(udpServer.Client);
+            sreceiver.NewUDPConnection += (e) =>
             {
-                TcpClient tcpClient = new TcpClient();
-                tcpClient.Connect("localhost", port);
-                ServerConnection = new(tcpClient.GetStream());
-            });
-            TcpClient tcpClient = tcpListener.AcceptTcpClient();
-            ClientConnection = new(tcpClient.GetStream());
+                ClientConnection = new(sreceiver.NetworkStreams[e.IPEndPoint]);
+            };
+            udpClient = new UdpClient();
+            udpClient.Connect("localhost", port);
+            ServerConnection = new(new UDPNetworkStream(udpClient.Client));
+            ServerConnection.CreateChannel("_");
+            Thread.Sleep(500);
         }
 
         [Test]
@@ -47,7 +52,7 @@ namespace SendingTest
             };
             Channel channel = ClientConnection.CreateChannel("master");
             channel.Send(bytes);
-            Thread.Sleep(100);
+            Thread.Sleep(1000);
             if (pass)
             {
                 Assert.Pass();

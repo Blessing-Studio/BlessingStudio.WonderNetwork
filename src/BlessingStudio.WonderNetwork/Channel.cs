@@ -1,4 +1,5 @@
-﻿using BlessingStudio.WonderNetwork.Interfaces;
+﻿using BlessingStudio.WonderNetwork.Events;
+using BlessingStudio.WonderNetwork.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.Data.Common;
@@ -11,6 +12,9 @@ namespace BlessingStudio.WonderNetwork
     {
         public IConnection Connection { get; private set; }
         public string ChannelName { get; private set; }
+
+        public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
+        public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
         public static bool operator ==(Channel left, Channel right)
         {
             return left.Connection == right.Connection && left.ChannelName == right.ChannelName;
@@ -43,6 +47,20 @@ namespace BlessingStudio.WonderNetwork
         public void Send<T>(T @object)
         {
             Connection.Send(ChannelName, @object);
+        }
+        public void OnReceive(byte[] data)
+        {
+            if(ReceivedBytes != null)
+            {
+                ReceivedBytes(new(this, Connection, data));
+            }
+        }
+        public void OnReceive(object @object)
+        {
+            if(ReceivedObject != null)
+            {
+                ReceivedObject(new(this, Connection, @object));
+            }
         }
     }
 }
