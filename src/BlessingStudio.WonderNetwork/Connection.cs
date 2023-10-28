@@ -100,13 +100,13 @@ namespace BlessingStudio.WonderNetwork
                 {
                     networkStream.WriteByte((byte)PacketType.DestroyChannel);
                     channels.Remove(name);
+                    networkStream.Flush();
                 }
                 if (ChannelDeleted != null)
                 {
                     ChannelDeleted(new(name, this));
                 }
             }
-            networkStream.Flush();
         }
 
         public Channel GetChannel(string name)
@@ -117,6 +117,16 @@ namespace BlessingStudio.WonderNetwork
                 return new(this, name);
             }
             throw new InvalidOperationException("Not Found");
+        }
+
+        public void SendMeaninglessPacket()
+        {
+            CheckDisposed();
+            lock (sendingLock)
+            {
+                networkStream.WriteByte((byte)PacketType.Meaningless);
+                networkStream.Flush();
+            }
         }
 
         public IReadOnlyList<Channel> GetChannels()

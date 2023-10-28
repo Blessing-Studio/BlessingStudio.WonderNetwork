@@ -9,6 +9,7 @@ namespace BlessingStudio.WonderNetwork.Enums
         CreateChannel,
         DestroyChannel,
         SendChannelByteData,
-        SendChannelObjectData
+        SendChannelObjectData,
+        Meaningless
     }
 }
