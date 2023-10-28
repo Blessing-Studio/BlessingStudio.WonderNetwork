@@ -200,19 +200,35 @@ namespace BlessingStudio.WonderNetwork
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
                                 Type? type = ReflectionUtils.GetType(typeName);
-                                if(type == null)
+                                if (type == null)
                                 {
                                     break;
                                 }
-                                if(connection.Serilizers[type] != null)
+                                ISerializer? serilizer = default;
+                                if (connection.Serilizers.ContainsKey(type))
                                 {
-                                    ISerializer serilizer = connection.Serilizers[type];
-                                    object @object = ReflectionUtils.Deserilize(type, serilizer, data);
-                                    Channel channel = connection.GetChannel(typeName);
-                                    if(connection.ReceivedObject != null)
+                                    serilizer = connection.Serilizers[type];
+                                }
+                                else
+                                {
+                                    foreach(KeyValuePair<Type, ISerializer> keyValuePair in connection.Serilizers)
                                     {
-                                        connection.ReceivedObject(new(channel, connection, @object));
+                                        if (type.IsSubclassOf(keyValuePair.Key))
+                                        {
+                                            serilizer = keyValuePair.Value;
+                                            break;
+                                        }
                                     }
+                                }
+                                if(serilizer == null)
+                                {
+                                    break;
+                                }
+                                object @object = ReflectionUtils.Deserilize(type, serilizer, data);
+                                Channel channel = connection.GetChannel(typeName);
+                                if (connection.ReceivedObject != null)
+                                {
+                                    connection.ReceivedObject(new(channel, connection, @object));
                                 }
                             }
                             break;
