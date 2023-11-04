@@ -18,9 +18,11 @@ namespace SendingTest
                 TcpClient tcpClient = new TcpClient();
                 tcpClient.Connect("localhost", port);
                 ServerConnection = new(tcpClient.GetStream());
+                ServerConnection.Start();
             });
             TcpClient tcpClient = tcpListener.AcceptTcpClient();
             ClientConnection = new(tcpClient.GetStream());
+            ClientConnection.Start();
         }
 
         [Test]

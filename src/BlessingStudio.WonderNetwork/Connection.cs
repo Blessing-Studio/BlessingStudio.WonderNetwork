@@ -27,7 +27,6 @@ namespace BlessingStudio.WonderNetwork
         public Connection(Stream networkStream)
         {
             this.networkStream = networkStream;
-            ReceivingThread.Start(this);
         }
         public void Send(string channelName, byte[] data)
         {
@@ -225,7 +224,7 @@ namespace BlessingStudio.WonderNetwork
                                     break;
                                 }
                                 object @object = ReflectionUtils.Deserilize(type, serilizer, data);
-                                Channel channel = connection.GetChannel(typeName);
+                                Channel channel = connection.GetChannel(name);
                                 if (connection.ReceivedObject != null)
                                 {
                                     connection.ReceivedObject(new(channel, connection, @object));
@@ -241,7 +240,14 @@ namespace BlessingStudio.WonderNetwork
                 connection.Dispose();
             }
         }
-
+        public void Start()
+        {
+            if(ReceivingThread.ThreadState == ThreadState.Unstarted || 
+                ReceivingThread.ThreadState == ThreadState.Stopped ||
+                ReceivingThread.ThreadState == ThreadState.Aborted
+                )
+            ReceivingThread.Start(this);
+        }
         public void Dispose()
         {
             networkStream.Dispose();

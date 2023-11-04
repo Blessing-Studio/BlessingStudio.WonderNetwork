@@ -12,6 +12,7 @@ namespace BlessingStudio.WonderNetwork.Threading
         public static int DefaultThreadCount = 4;
         public event Events.EventHandler<NewUDPConnectionEvent>? NewUDPConnection;
         private List<Thread> threads = new List<Thread>();
+        private Dictionary<Thread, CancellationTokenSource> cancellationTokens = new();
         private object threadLock = new object();
         private int reducingReadyed = 0;
         private object threadCountChangingLock = new();
@@ -27,8 +28,11 @@ namespace BlessingStudio.WonderNetwork.Threading
             for (int i = 0; i < DefaultThreadCount; i++)
             {
                 Thread thread = new(ReceivingThread);
-                thread.Start(this);
+                CancellationTokenSource token = new CancellationTokenSource();
+                thread.Start(new object[] {this, token.Token});
                 threads.Add(thread);
+                cancellationTokens[thread] = token;
+                thread.Name = "WonderNetoworkThread";
             }
         }
         public void SetThreadCount(int count)
@@ -49,7 +53,8 @@ namespace BlessingStudio.WonderNetwork.Threading
                     }
                     while (ThreadCount == count)
                     {
-                        threads.First().Abort();
+                        cancellationTokens[threads.First()].Cancel();
+                        cancellationTokens.Remove(threads.First());
                         threads.RemoveAt(0);
                     }
                     ThreadCountReducing = false;
@@ -60,22 +65,27 @@ namespace BlessingStudio.WonderNetwork.Threading
                     while(ThreadCount == count)
                     {
                         Thread thread = new(ReceivingThread);
-                        thread.Start(this);
+                        CancellationTokenSource token = new CancellationTokenSource();
+                        thread.Start(new object[] { this, token.Token });
                         threads.Add(thread);
+                        cancellationTokens[thread] = token;
+                        thread.Name = "WonderNetoworkThread";
                     }
                 }
             }
         }
         private static void ReceivingThread(object? arg)
         {
-            UDPReceiver receiver = (UDPReceiver)arg!;
-            while(true)
+            UDPReceiver receiver = (UDPReceiver)((object[])arg)[0]!;
+            CancellationToken cancellationToken = (CancellationToken)((object[])arg)[0]!;
+            while (true)
             {
                 if(receiver.ThreadCountReducing)
                 {
                     receiver.reducingReadyed++;
                     while (receiver.ThreadCountReducing)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         Thread.Sleep(10);
                     }
                 }
@@ -95,7 +105,7 @@ namespace BlessingStudio.WonderNetwork.Threading
                 {
                     IPEndPoint iPEndPoint = (IPEndPoint)endPoint;
                     byte[] buffer = new byte[count];
-                    MemoryStream memoryStream = new(bytes);
+                    using MemoryStream memoryStream = new(bytes);
                     memoryStream.Read(buffer);
                     memoryStream.Close();
                     if (receiver.NetworkStreams.ContainsKey(iPEndPoint))

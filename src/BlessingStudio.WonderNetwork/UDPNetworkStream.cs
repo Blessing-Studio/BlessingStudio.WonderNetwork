@@ -25,9 +25,8 @@ namespace BlessingStudio.WonderNetwork
 
         public override void Flush()
         {
-            byte[] buffer = new byte[s_buffer.Length];
             s_buffer.Position = 0;
-            s_buffer.Read(buffer);
+            byte[] buffer = s_buffer.ToArray(); ;
             s_buffer.Flush();
             if (ConnectionToServer)
             {
@@ -51,7 +50,7 @@ namespace BlessingStudio.WonderNetwork
                     {
                         byte[] bytes = new byte[Buffersize];
                         int c = Socket.Receive(bytes);
-                        MemoryStream memoryStream = new(bytes);
+                        using MemoryStream memoryStream = new(bytes);
                         byte[] bytes1 = new byte[c];
                         memoryStream.Read(bytes1);
                         OnReceive(bytes1);

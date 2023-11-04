@@ -20,11 +20,13 @@ namespace SendingTest
             sreceiver.NewUDPConnection += (e) =>
             {
                 ClientConnection = new(sreceiver.NetworkStreams[e.IPEndPoint]);
+                ClientConnection.Start();
             };
             udpClient = new UdpClient();
             udpClient.Connect("localhost", port);
             ServerConnection = new(new UDPNetworkStream(udpClient.Client));
             ServerConnection.CreateChannel("_");
+            ServerConnection.Start();
             Thread.Sleep(500);
         }
 
