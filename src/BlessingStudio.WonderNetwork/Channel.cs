@@ -12,9 +12,6 @@ namespace BlessingStudio.WonderNetwork
     {
         public IConnection Connection { get; private set; }
         public string ChannelName { get; private set; }
-
-        public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
-        public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
         public static bool operator ==(Channel left, Channel right)
         {
             return left.Connection == right.Connection && left.ChannelName == right.ChannelName;
@@ -48,19 +45,25 @@ namespace BlessingStudio.WonderNetwork
         {
             Connection.Send(ChannelName, @object);
         }
-        public void OnReceive(byte[] data)
+        public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler)
         {
-            if(ReceivedBytes != null)
+            Connection.AddHandler((ReceivedBytesEvent e) =>
             {
-                ReceivedBytes(new(this, Connection, data));
-            }
+                if(e.Channel == this)
+                {
+                    handler(e);
+                }
+            });
         }
-        public void OnReceive(object @object)
+        public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler)
         {
-            if(ReceivedObject != null)
+            Connection.AddHandler((ReceivedObjectEvent e) =>
             {
-                ReceivedObject(new(this, Connection, @object));
-            }
+                if (e.Channel == this)
+                {
+                    handler(e);
+                }
+            });
         }
     }
 }

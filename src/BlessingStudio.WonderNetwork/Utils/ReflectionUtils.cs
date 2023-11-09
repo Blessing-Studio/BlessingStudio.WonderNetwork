@@ -18,7 +18,7 @@ namespace BlessingStudio.WonderNetwork.Utils
             if (interfaceType.GenericTypeArguments.Length == 1)
             {
                 Type genericType = interfaceType.GenericTypeArguments[0];
-                if(type == genericType || type.IsSubclassOf(genericType))
+                if(type == genericType || type.IsSubclassOf(genericType) || type.GetInterfaces().Contains(genericType))
                 {
                     MethodInfo methodInfo = interfaceType.GetMethod("Deserialize")!;
                     return methodInfo.Invoke(serilizer, new object[] { data })!;

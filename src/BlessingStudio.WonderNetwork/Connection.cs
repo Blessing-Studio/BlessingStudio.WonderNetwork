@@ -7,6 +7,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
@@ -18,7 +19,7 @@ namespace BlessingStudio.WonderNetwork
         private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
         public object sendingLock = new object();
         private List<string> channels = new List<string>();
-        public Dictionary<Type, ISerializer> Serilizers { get; private set; } = new();
+        public Dictionary<Type, ISerializer> Serializers { get; private set; } = new();
         public bool IsDisposed { get; private set; }
         public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
         public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
@@ -50,23 +51,36 @@ namespace BlessingStudio.WonderNetwork
         public void Send<T>(string channelName, T data)
         {
             Type type = typeof(T);
-            if (Serilizers.ContainsKey(type))
+            ISerializer? serializer = default;
+            if (Serializers.ContainsKey(type))
             {
-                ISerializer<T> serilizer = (ISerializer<T>)Serilizers[type];
-                byte[] buffer = serilizer.Serialize(data);
-                lock (sendingLock)
-                {
-                    networkStream.WriteByte((byte)PacketType.SendChannelObjectData);
-                    networkStream.WriteString(channelName);
-                    networkStream.WriteString(type.FullName!);
-                    networkStream.WriteVarInt(buffer.Length);
-                    networkStream.Write(buffer);
-                    networkStream.Flush();
-                }
+                serializer = Serializers[type];
             }
             else
             {
+                foreach (KeyValuePair<Type, ISerializer> keyValuePair in Serializers)
+                {
+                    if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
+                    {
+                        serializer = keyValuePair.Value;
+                        break;
+                    }
+                }
+            }
+            if (serializer == null)
+            {
                 throw new InvalidOperationException("Serilizer Not Found");
+            }
+            MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
+            byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
+            lock (sendingLock)
+            {
+                networkStream.WriteByte((byte)PacketType.SendChannelObjectData);
+                networkStream.WriteString(channelName);
+                networkStream.WriteString(type.FullName!);
+                networkStream.WriteVarInt(buffer.Length);
+                networkStream.Write(buffer);
+                networkStream.Flush();
             }
         }
         public Channel CreateChannel(string name)
@@ -82,7 +96,7 @@ namespace BlessingStudio.WonderNetwork
                 networkStream.WriteString(name);
                 networkStream.Flush();
                 channels.Add(name);
-                if(ChannelCreated != null)
+                if (ChannelCreated != null)
                 {
                     ChannelCreated(new(GetChannel(name), this));
                 }
@@ -144,7 +158,7 @@ namespace BlessingStudio.WonderNetwork
             Stream networkStream = connection.networkStream;
             try
             {
-            while (true)
+                while (true)
                 {
                     PacketType packetType = (PacketType)networkStream.ReadByte();
                     connection.CheckDisposed();
@@ -156,7 +170,7 @@ namespace BlessingStudio.WonderNetwork
                                 if (!connection.channels.Contains(name))
                                 {
                                     connection.channels.Add(name);
-                                    if(connection.ChannelCreated != null)
+                                    if (connection.ChannelCreated != null)
                                     {
                                         connection.ChannelCreated(new(connection.GetChannel(name), connection));
                                     }
@@ -169,7 +183,7 @@ namespace BlessingStudio.WonderNetwork
                                 if (connection.channels.Contains(name))
                                 {
                                     connection.channels.Remove(name);
-                                    if(connection.ChannelDeleted != null)
+                                    if (connection.ChannelDeleted != null)
                                     {
                                         connection.ChannelDeleted(new(name, connection));
                                     }
@@ -188,7 +202,6 @@ namespace BlessingStudio.WonderNetwork
                                 {
                                     connection.ReceivedBytes(@event);
                                 }
-                                channel.OnReceive(data);
                             }
                             break;
                         case PacketType.SendChannelObjectData:
@@ -204,22 +217,22 @@ namespace BlessingStudio.WonderNetwork
                                     break;
                                 }
                                 ISerializer? serilizer = default;
-                                if (connection.Serilizers.ContainsKey(type))
+                                if (connection.Serializers.ContainsKey(type))
                                 {
-                                    serilizer = connection.Serilizers[type];
+                                    serilizer = connection.Serializers[type];
                                 }
                                 else
                                 {
-                                    foreach(KeyValuePair<Type, ISerializer> keyValuePair in connection.Serilizers)
+                                    foreach (KeyValuePair<Type, ISerializer> keyValuePair in connection.Serializers)
                                     {
-                                        if (type.IsSubclassOf(keyValuePair.Key))
+                                        if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
                                         {
                                             serilizer = keyValuePair.Value;
                                             break;
                                         }
                                     }
                                 }
-                                if(serilizer == null)
+                                if (serilizer == null)
                                 {
                                     break;
                                 }
@@ -235,18 +248,18 @@ namespace BlessingStudio.WonderNetwork
                     }
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 connection.Dispose();
             }
         }
         public void Start()
         {
-            if(ReceivingThread.ThreadState == ThreadState.Unstarted || 
+            if (ReceivingThread.ThreadState == ThreadState.Unstarted ||
                 ReceivingThread.ThreadState == ThreadState.Stopped ||
                 ReceivingThread.ThreadState == ThreadState.Aborted
                 )
-            ReceivingThread.Start(this);
+                ReceivingThread.Start(this);
         }
         public void Dispose()
         {
@@ -269,6 +282,16 @@ namespace BlessingStudio.WonderNetwork
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetChannels().GetEnumerator();
+        }
+
+        public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler)
+        {
+            ReceivedBytes += handler;
+        }
+
+        public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler)
+        {
+            ReceivedObject += handler;
         }
     }
 }

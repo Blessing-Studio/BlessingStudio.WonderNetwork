@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BlessingStudio.WonderNetwork.Events;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -16,5 +17,7 @@ namespace BlessingStudio.WonderNetwork.Interfaces
         {
             DestroyChannel(channel.ChannelName);
         }
+        public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler);
+        public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler);
     }
 }
