@@ -25,6 +25,7 @@ namespace BlessingStudio.WonderNetwork
         public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
         public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
         public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
+        public event Events.EventHandler<DisposedEvent>? Disposed;
         public Connection(Stream networkStream)
         {
             this.networkStream = networkStream;
@@ -265,6 +266,10 @@ namespace BlessingStudio.WonderNetwork
         {
             networkStream.Dispose();
             IsDisposed = true;
+            if(Disposed != null)
+            {
+                Disposed(new(this));
+            }
         }
         private void CheckDisposed()
         {
@@ -292,6 +297,11 @@ namespace BlessingStudio.WonderNetwork
         public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler)
         {
             ReceivedObject += handler;
+        }
+
+        public void AddHandler(Events.EventHandler<DisposedEvent> handler)
+        {
+            Disposed += handler;
         }
     }
 }
