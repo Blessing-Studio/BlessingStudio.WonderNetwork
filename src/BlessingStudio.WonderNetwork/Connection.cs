@@ -84,6 +84,40 @@ namespace BlessingStudio.WonderNetwork
                 networkStream.Flush();
             }
         }
+        public T WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
+        {
+            T? result = default;
+            void a(ReceivedObjectEvent @event)
+            {
+                if(result == null && @event.Channel.ChannelName == channelName && @event is T)
+                {
+                    result = (T)@event.Object;
+                    ReceivedObject -= a;
+                }
+            }
+            ReceivedObject += a;
+            while (true)
+            {
+                if (result != null)
+                {
+                    return result!;
+                }
+                else
+                {
+                    Thread.Sleep(1);
+                }
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+        public T? WaitFor<T>(string channelName,TimeSpan timeout)
+        {
+            T? result = default;
+            ThreadUtils.Run((c) =>
+            {
+                result = WaitFor<T>(channelName);
+            }, timeout);
+            return result;
+        }
         public Channel CreateChannel(string name)
         {
             CheckDisposed();
