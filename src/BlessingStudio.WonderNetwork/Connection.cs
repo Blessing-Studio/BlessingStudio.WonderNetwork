@@ -26,6 +26,7 @@ namespace BlessingStudio.WonderNetwork
         public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
         public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
         public event Events.EventHandler<DisposedEvent>? Disposed;
+        public List<IHandler> Handlers { get; } = new List<IHandler>();
         public Connection(Stream networkStream)
         {
             this.networkStream = networkStream;
@@ -87,15 +88,17 @@ namespace BlessingStudio.WonderNetwork
         public T WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
         {
             T? result = default;
+            SimpleHandler handler = new SimpleHandler();
+            handler.ReceivedObject += a;
             void a(ReceivedObjectEvent @event)
             {
                 if(result == null && @event.Channel.ChannelName == channelName && @event is T)
                 {
                     result = (T)@event.Object;
-                    ReceivedObject -= a;
+                    RemoveHandler(handler);
                 }
             }
-            ReceivedObject += a;
+            AddHandler(handler);
             while (true)
             {
                 if (result != null)
@@ -205,10 +208,12 @@ namespace BlessingStudio.WonderNetwork
                                 if (!connection.channels.Contains(name))
                                 {
                                     connection.channels.Add(name);
+                                    ChannelCreatedEvent e = new(connection.GetChannel(name), connection);
                                     if (connection.ChannelCreated != null)
                                     {
-                                        connection.ChannelCreated(new(connection.GetChannel(name), connection));
+                                        connection.ChannelCreated(e);
                                     }
+                                    connection.CallEventToHandlers(e);
                                 }
                             }
                             break;
@@ -218,10 +223,12 @@ namespace BlessingStudio.WonderNetwork
                                 if (connection.channels.Contains(name))
                                 {
                                     connection.channels.Remove(name);
+                                    ChannelDeletedEvent e = new(name, connection);
                                     if (connection.ChannelDeleted != null)
                                     {
-                                        connection.ChannelDeleted(new(name, connection));
+                                        connection.ChannelDeleted(e);
                                     }
+                                    connection.CallEventToHandlers(e);
                                 }
                             }
                             break;
@@ -237,6 +244,7 @@ namespace BlessingStudio.WonderNetwork
                                 {
                                     connection.ReceivedBytes(@event);
                                 }
+                                connection.CallEventToHandlers(@event);
                             }
                             break;
                         case PacketType.SendChannelObjectData:
@@ -273,10 +281,12 @@ namespace BlessingStudio.WonderNetwork
                                 }
                                 object @object = ReflectionUtils.Deserilize(type, serilizer, data);
                                 Channel channel = connection.GetChannel(name);
+                                ReceivedObjectEvent e = new(channel, connection, @object);
                                 if (connection.ReceivedObject != null)
                                 {
-                                    connection.ReceivedObject(new(channel, connection, @object));
+                                    connection.ReceivedObject(e);
                                 }
+                                connection.CallEventToHandlers(e);
                             }
                             break;
                         default: break;
@@ -336,6 +346,53 @@ namespace BlessingStudio.WonderNetwork
         public void AddHandler(Events.EventHandler<DisposedEvent> handler)
         {
             Disposed += handler;
+        }
+
+        public void AddHandler(Events.EventHandler<ChannelCreatedEvent> handler)
+        {
+            ChannelCreated += handler;
+        }
+
+        public void AddHandler(Events.EventHandler<ChannelDeletedEvent> handler)
+        {
+            ChannelDeleted += handler;
+        }
+
+        public void AddHandler(IHandler handler)
+        {
+            Handlers.Add(handler);
+        }
+
+        public void RemoveHandler(IHandler handler)
+        {
+            Handlers.Remove(handler);
+        }
+        
+        private void CallEventToHandlers(IEvent @event)
+        {
+            foreach (IHandler handler in Handlers)
+            {
+                if(@event is ReceivedBytesEvent)
+                {
+                    handler.OnReceivedBytes((ReceivedBytesEvent)@event);
+                }
+                if (@event is ReceivedObjectEvent)
+                {
+                    handler.OnReceivedObject((ReceivedObjectEvent)@event);
+                }
+                if (@event is DisposedEvent)
+                {
+                    handler.OnDisposed((DisposedEvent)@event);
+                }
+                if (@event is ChannelCreatedEvent)
+                {
+                    handler.OnChannelCreated((ChannelCreatedEvent)@event);
+                }
+                if (@event is ChannelDeletedEvent)
+                {
+                    handler.OnChannelDeleted((ChannelDeletedEvent)@event);
+                }
+            }
         }
     }
 }

@@ -20,5 +20,9 @@ namespace BlessingStudio.WonderNetwork.Interfaces
         public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler);
         public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler);
         public void AddHandler(Events.EventHandler<DisposedEvent> handler);
+        public void AddHandler(Events.EventHandler<ChannelCreatedEvent> handler);
+        public void AddHandler(Events.EventHandler<ChannelDeletedEvent> handler);
+        public void AddHandler(IHandler handler);
+        public void RemoveHandler(IHandler handler);
     }
 }
