@@ -85,17 +85,16 @@ namespace BlessingStudio.WonderNetwork
                 networkStream.Flush();
             }
         }
-        public T WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
+        public T? WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
         {
             T? result = default;
             SimpleHandler handler = new SimpleHandler();
             handler.ReceivedObject += a;
             void a(ReceivedObjectEvent @event)
             {
-                if(result == null && @event.Channel.ChannelName == channelName && @event is T)
+                if(result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
                 {
                     result = (T)@event.Object;
-                    RemoveHandler(handler);
                 }
             }
             AddHandler(handler);
@@ -103,13 +102,14 @@ namespace BlessingStudio.WonderNetwork
             {
                 if (result != null)
                 {
+                    RemoveHandler(handler);
                     return result!;
                 }
                 else
                 {
                     Thread.Sleep(1);
                 }
-                cancellationToken.ThrowIfCancellationRequested();
+                if(cancellationToken.IsCancellationRequested) return result;
             }
         }
         public T? WaitFor<T>(string channelName,TimeSpan timeout)
@@ -117,7 +117,7 @@ namespace BlessingStudio.WonderNetwork
             T? result = default;
             ThreadUtils.Run((c) =>
             {
-                result = WaitFor<T>(channelName);
+                result = WaitFor<T>(channelName, c);
             }, timeout);
             return result;
         }

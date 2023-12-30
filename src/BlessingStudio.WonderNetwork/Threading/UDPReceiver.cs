@@ -77,7 +77,7 @@ namespace BlessingStudio.WonderNetwork.Threading
         private static void ReceivingThread(object? arg)
         {
             UDPReceiver receiver = (UDPReceiver)((object[])arg)[0]!;
-            CancellationToken cancellationToken = (CancellationToken)((object[])arg)[0]!;
+            CancellationToken cancellationToken = (CancellationToken)((object[])arg)[1]!;
             while (true)
             {
                 if(receiver.ThreadCountReducing)

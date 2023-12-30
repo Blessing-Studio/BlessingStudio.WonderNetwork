@@ -74,8 +74,8 @@ namespace SendingTest
             {
                 pass = class1.Equals(e.Object);
             };
-            ServerConnection.Serilizers[typeof(Class1)] = new Class1Serilizer();
-            ClientConnection.Serilizers[typeof(Class1)] = new Class1Serilizer();
+            ServerConnection.Serializers[typeof(Class1)] = new Class1Serilizer();
+            ClientConnection.Serializers[typeof(Class1)] = new Class1Serilizer();
             Channel channel = ClientConnection.CreateChannel("master");
             channel.Send(class1);
             Thread.Sleep(100);
