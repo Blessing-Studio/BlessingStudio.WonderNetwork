@@ -34,7 +34,7 @@ namespace BlessingStudio.WonderNetwork
         public void Send(string channelName, byte[] data)
         {
             CheckDisposed();
-            if (channels.Contains(channelName))
+            if (channels.Contains(channelName) && data.Length != 0)
             {
                 lock (sendingLock)
                 {
@@ -52,6 +52,7 @@ namespace BlessingStudio.WonderNetwork
         }
         public void Send<T>(string channelName, T data)
         {
+            CheckDisposed();
             Type type = typeof(T);
             ISerializer? serializer = default;
             if (Serializers.ContainsKey(type))
@@ -92,7 +93,7 @@ namespace BlessingStudio.WonderNetwork
             handler.ReceivedObject += a;
             void a(ReceivedObjectEvent @event)
             {
-                if(result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
+                if (result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
                 {
                     result = (T)@event.Object;
                 }
@@ -109,10 +110,10 @@ namespace BlessingStudio.WonderNetwork
                 {
                     Thread.Sleep(1);
                 }
-                if(cancellationToken.IsCancellationRequested) return result;
+                if (cancellationToken.IsCancellationRequested) return result;
             }
         }
-        public T? WaitFor<T>(string channelName,TimeSpan timeout)
+        public T? WaitFor<T>(string channelName, TimeSpan timeout)
         {
             T? result = default;
             ThreadUtils.Run((c) =>
@@ -238,13 +239,16 @@ namespace BlessingStudio.WonderNetwork
                                 int length = networkStream.ReadVarInt();
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
-                                Channel channel = connection.GetChannel(name);
-                                ReceivedBytesEvent @event = new(channel, connection, data);
-                                if (connection.ReceivedBytes != null)
+                                if (connection.channels.Contains(name))
                                 {
-                                    connection.ReceivedBytes(@event);
+                                    Channel channel = connection.GetChannel(name);
+                                    ReceivedBytesEvent @event = new(channel, connection, data);
+                                    if (connection.ReceivedBytes != null)
+                                    {
+                                        connection.ReceivedBytes(@event);
+                                    }
+                                    connection.CallEventToHandlers(@event);
                                 }
-                                connection.CallEventToHandlers(@event);
                             }
                             break;
                         case PacketType.SendChannelObjectData:
@@ -280,13 +284,16 @@ namespace BlessingStudio.WonderNetwork
                                     break;
                                 }
                                 object @object = ReflectionUtils.Deserilize(type, serilizer, data);
-                                Channel channel = connection.GetChannel(name);
-                                ReceivedObjectEvent e = new(channel, connection, @object);
-                                if (connection.ReceivedObject != null)
+                                if (connection.channels.Contains(name))
                                 {
-                                    connection.ReceivedObject(e);
+                                    Channel channel = connection.GetChannel(name);
+                                    ReceivedObjectEvent e = new(channel, connection, @object);
+                                    if (connection.ReceivedObject != null)
+                                    {
+                                        connection.ReceivedObject(e);
+                                    }
+                                    connection.CallEventToHandlers(e);
                                 }
-                                connection.CallEventToHandlers(e);
                             }
                             break;
                         default: break;
@@ -310,7 +317,7 @@ namespace BlessingStudio.WonderNetwork
         {
             networkStream.Dispose();
             IsDisposed = true;
-            if(Disposed != null)
+            if (Disposed != null)
             {
                 Disposed(new(this));
             }
@@ -367,12 +374,12 @@ namespace BlessingStudio.WonderNetwork
         {
             Handlers.Remove(handler);
         }
-        
+
         private void CallEventToHandlers(IEvent @event)
         {
             foreach (IHandler handler in Handlers)
             {
-                if(@event is ReceivedBytesEvent)
+                if (@event is ReceivedBytesEvent)
                 {
                     handler.OnReceivedBytes((ReceivedBytesEvent)@event);
                 }
