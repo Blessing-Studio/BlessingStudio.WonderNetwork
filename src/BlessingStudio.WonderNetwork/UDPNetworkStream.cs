@@ -38,10 +38,7 @@ namespace BlessingStudio.WonderNetwork
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            if (!BufferUtils.CheckBufferArgs(buffer, offset, count))
-            {
-                throw new ArgumentException();
-            }
+            BufferUtils.ValidateBufferArguments(buffer, offset, count);
             if (ConnectionToServer)
             {
                 while (this.r_buffer.Count < count)

@@ -10,5 +10,12 @@ namespace BlessingStudio.WonderNetwork.Utils
         {
             return buffer.Length - offset >= count;
         }
+        public static void ValidateBufferArguments(byte[] buffer, int offset, int count)
+        {
+            if(!CheckBufferArgs(buffer, offset, count))
+            {
+                throw new ArgumentException();
+            }
+        }
     }
 }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using BlessingStudio.WonderNetwork.Utils;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
@@ -33,13 +34,18 @@ namespace BlessingStudio.WonderNetwork
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            ValidateBufferArguments(buffer, offset, count);
-            MemoryStream stream = new MemoryStream();
+            BufferUtils.CheckBufferArgs(buffer, offset, count);
+            using MemoryStream stream = new MemoryStream();
             byte[] bytes = new byte[count];
             int rest = count;
             while (rest != 0)
             {
                 int c = NetworkStream.Read(bytes, 0, rest);
+                if (c == 0)
+                {
+                    Thread.Sleep(1);
+                    continue;
+                }
                 rest -= c;
                 stream.Write(bytes, 0, c);
             }
