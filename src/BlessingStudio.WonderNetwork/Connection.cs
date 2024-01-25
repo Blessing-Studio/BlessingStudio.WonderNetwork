@@ -33,18 +33,15 @@ namespace BlessingStudio.WonderNetwork
         }
         public void Send(string channelName, byte[] data)
         {
-            Console.WriteLine("SendBytes");
             CheckDisposed();
             if (channels.Contains(channelName) && data.Length != 0)
             {
-                using MemoryStream memoryStream = new MemoryStream();
-                memoryStream.WriteByte((byte)PacketType.SendChannelByteData);
-                memoryStream.WriteString(channelName);
-                memoryStream.WriteInt32(data.Length);
-                memoryStream.Write(data);
                 lock (sendingLock)
                 {
-                    networkStream.Write(memoryStream.ToArray());
+                    networkStream.WriteByte((byte)PacketType.SendChannelByteData);
+                    networkStream.WriteString(channelName);
+                    networkStream.WriteVarInt(data.Length);
+                    networkStream.Write(data);
                     networkStream.Flush();
                 }
             }
@@ -55,7 +52,6 @@ namespace BlessingStudio.WonderNetwork
         }
         public void Send<T>(string channelName, T data)
         {
-            Console.WriteLine("SendObject");
             CheckDisposed();
             Type type = typeof(T);
             ISerializer? serializer = default;
@@ -80,15 +76,13 @@ namespace BlessingStudio.WonderNetwork
             }
             MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
             byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
-            using MemoryStream memoryStream = new MemoryStream();
-            memoryStream.WriteByte((byte)PacketType.SendChannelObjectData);
-            memoryStream.WriteString(channelName);
-            memoryStream.WriteString(type.FullName!);
-            memoryStream.WriteInt32(buffer.Length);
-            memoryStream.Write(buffer);
             lock (sendingLock)
             {
-                networkStream.Write(memoryStream.ToArray());
+                networkStream.WriteByte((byte)PacketType.SendChannelObjectData);
+                networkStream.WriteString(channelName);
+                networkStream.WriteString(type.FullName!);
+                networkStream.WriteVarInt(buffer.Length);
+                networkStream.Write(buffer);
                 networkStream.Flush();
             }
         }
@@ -130,47 +124,40 @@ namespace BlessingStudio.WonderNetwork
         }
         public Channel CreateChannel(string name)
         {
-            Console.WriteLine("CreateChannel");
             CheckDisposed();
             if (channels.Contains(name))
             {
                 return GetChannel(name);
             }
-            using MemoryStream memoryStream = new MemoryStream();
-            memoryStream.WriteByte((byte)PacketType.CreateChannel);
-            memoryStream.WriteString(name);
             lock (sendingLock)
             {
-                networkStream.Write(memoryStream.ToArray());
+                networkStream.WriteByte((byte)PacketType.CreateChannel);
+                networkStream.WriteString(name);
                 networkStream.Flush();
+                channels.Add(name);
+                if (ChannelCreated != null)
+                {
+                    ChannelCreated(new(GetChannel(name), this));
+                }
+                return GetChannel(name);
             }
-            channels.Add(name);
-            //if (ChannelCreated != null)
-            //{
-            //    ChannelCreated(new(GetChannel(name), this));
-            //}
-            return GetChannel(name);
         }
 
         public void DestroyChannel(string name)
         {
-            Console.WriteLine("DestroyChannel");
             CheckDisposed();
             if (channels.Contains(name))
             {
-                using MemoryStream memoryStream = new MemoryStream();
-                memoryStream.WriteByte((byte)PacketType.DestroyChannel);
-                memoryStream.WriteString(name);
                 lock (sendingLock)
                 {
-                    networkStream.Write(memoryStream.ToArray());
+                    networkStream.WriteByte((byte)PacketType.DestroyChannel);
+                    channels.Remove(name);
                     networkStream.Flush();
                 }
-                channels.Remove(name);
-                //if (ChannelDeleted != null)
-                //{
-                //    ChannelDeleted(new(name, this));
-                //}
+                if (ChannelDeleted != null)
+                {
+                    ChannelDeleted(new(name, this));
+                }
             }
         }
 
@@ -214,7 +201,6 @@ namespace BlessingStudio.WonderNetwork
                 {
                     PacketType packetType = (PacketType)networkStream.ReadByte();
                     connection.CheckDisposed();
-                    Console.WriteLine(packetType.ToString());
                     switch (packetType)
                     {
                         case PacketType.CreateChannel:
@@ -250,7 +236,7 @@ namespace BlessingStudio.WonderNetwork
                         case PacketType.SendChannelByteData:
                             {
                                 string name = networkStream.ReadString();
-                                int length = networkStream.ReadInt32();
+                                int length = networkStream.ReadVarInt();
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
                                 if (connection.channels.Contains(name))
@@ -269,7 +255,7 @@ namespace BlessingStudio.WonderNetwork
                             {
                                 string name = networkStream.ReadString();
                                 string typeName = networkStream.ReadString();
-                                int length = networkStream.ReadInt32();
+                                int length = networkStream.ReadVarInt();
                                 byte[] data = new byte[length];
                                 networkStream.Read(data);
                                 Type? type = ReflectionUtils.GetType(typeName);
@@ -316,7 +302,6 @@ namespace BlessingStudio.WonderNetwork
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
                 connection.Dispose();
             }
         }

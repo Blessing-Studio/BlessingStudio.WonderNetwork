@@ -7,35 +7,35 @@ namespace BlessingStudio.WonderNetwork.Extensions
 {
     public static class StreamExtensions
     {
-        //public static int ReadVarInt(this Stream stream)
-        //{
-        //    uint result = 0;
-        //    int length = 0;
-        //    while (true)
-        //    {
-        //        byte current = stream.ReadUInt8();
-        //        result |= (current & 0x7Fu) << length++ * 7;
-        //        if (length > 5)
-        //            throw new InvalidDataException("VarInt may not be longer than 28 bits.");
-        //        if ((current & 0x80) != 128)
-        //            break;
-        //    }
-        //    return (int)result;
-        //}
-        //public static void WriteVarInt(this Stream stream, int _value)
-        //{
-        //    uint value = (uint)_value;
-        //    while (true)
-        //    {
-        //        if ((value & 0xFFFFFF80u) == 0)
-        //        {
-        //            stream.WriteUInt8((byte)value);
-        //            break;
-        //        }
-        //        stream.WriteUInt8((byte)(value & 0x7F | 0x80));
-        //        value >>= 7;
-        //    }
-        //}
+        public static int ReadVarInt(this Stream stream)
+        {
+            uint result = 0;
+            int length = 0;
+            while (true)
+            {
+                byte current = stream.ReadUInt8();
+                result |= (current & 0x7Fu) << length++ * 7;
+                if (length > 5)
+                    throw new InvalidDataException("VarInt may not be longer than 28 bits.");
+                if ((current & 0x80) != 128)
+                    break;
+            }
+            return (int)result;
+        }
+        public static void WriteVarInt(this Stream stream, int _value)
+        {
+            uint value = (uint)_value;
+            while (true)
+            {
+                if ((value & 0xFFFFFF80u) == 0)
+                {
+                    stream.WriteUInt8((byte)value);
+                    break;
+                }
+                stream.WriteUInt8((byte)(value & 0x7F | 0x80));
+                value >>= 7;
+            }
+        }
         public static string ReadString(this Stream stream)
         {
             long length = stream.ReadInt32();
