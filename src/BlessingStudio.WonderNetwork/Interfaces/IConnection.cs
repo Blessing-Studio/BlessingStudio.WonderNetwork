@@ -24,5 +24,7 @@ namespace BlessingStudio.WonderNetwork.Interfaces
         public void AddHandler(Events.EventHandler<ChannelDeletedEvent> handler);
         public void AddHandler(IHandler handler);
         public void RemoveHandler(IHandler handler);
+        public T? WaitFor<T>(string channelName, TimeSpan timeout);
+        public T? WaitFor<T>(string channelName, CancellationToken cancellationToken = default);
     }
 }

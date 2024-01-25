@@ -65,5 +65,13 @@ namespace BlessingStudio.WonderNetwork
                 }
             });
         }
+        public T? WaitFor<T>(TimeSpan timeout)
+        {
+            return Connection.WaitFor<T>(ChannelName, timeout);
+        }
+        public T? WaitFor<T>(CancellationToken cancellationToken = default)
+        {
+            return Connection.WaitFor<T>(ChannelName, cancellationToken);
+        }
     }
 }
