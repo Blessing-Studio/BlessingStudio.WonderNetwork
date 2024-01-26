@@ -36,12 +36,14 @@ namespace BlessingStudio.WonderNetwork
             CheckDisposed();
             if (channels.Contains(channelName) && data.Length != 0)
             {
+                using MemoryStream memoryStream = new MemoryStream();
+                memoryStream.WriteByte((byte)PacketType.SendChannelByteData);
+                memoryStream.WriteString(channelName);
+                memoryStream.WriteVarInt(data.Length);
+                memoryStream.Write(data);
                 lock (sendingLock)
                 {
-                    networkStream.WriteByte((byte)PacketType.SendChannelByteData);
-                    networkStream.WriteString(channelName);
-                    networkStream.WriteVarInt(data.Length);
-                    networkStream.Write(data);
+                    networkStream.Write(memoryStream.ToArray());
                     networkStream.Flush();
                 }
             }
@@ -53,6 +55,10 @@ namespace BlessingStudio.WonderNetwork
         public void Send<T>(string channelName, T data)
         {
             CheckDisposed();
+            if (!channels.Contains(channelName))
+            {
+                throw new InvalidOperationException();
+            }
             Type type = typeof(T);
             ISerializer? serializer = default;
             if (Serializers.ContainsKey(type))
@@ -76,18 +82,25 @@ namespace BlessingStudio.WonderNetwork
             }
             MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
             byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
+            using MemoryStream memoryStream = new MemoryStream();
+            memoryStream.WriteByte((byte)PacketType.SendChannelObjectData);
+            memoryStream.WriteString(channelName);
+            memoryStream.WriteString(type.FullName!);
+            memoryStream.WriteVarInt(buffer.Length);
+            memoryStream.Write(buffer);
             lock (sendingLock)
             {
-                networkStream.WriteByte((byte)PacketType.SendChannelObjectData);
-                networkStream.WriteString(channelName);
-                networkStream.WriteString(type.FullName!);
-                networkStream.WriteVarInt(buffer.Length);
-                networkStream.Write(buffer);
+                networkStream.Write(memoryStream.ToArray());
                 networkStream.Flush();
             }
         }
         public T? WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
         {
+            CheckDisposed();
+            if (!channels.Contains(channelName))
+            {
+                throw new InvalidOperationException();
+            }
             T? result = default;
             SimpleHandler handler = new SimpleHandler();
             handler.ReceivedObject += a;
@@ -115,6 +128,11 @@ namespace BlessingStudio.WonderNetwork
         }
         public T? WaitFor<T>(string channelName, TimeSpan timeout)
         {
+            CheckDisposed();
+            if (!channels.Contains(channelName))
+            {
+                throw new InvalidOperationException();
+            }
             T? result = default;
             ThreadUtils.Run((c) =>
             {
@@ -129,35 +147,41 @@ namespace BlessingStudio.WonderNetwork
             {
                 return GetChannel(name);
             }
+            using MemoryStream memoryStream = new MemoryStream();
+            memoryStream.WriteByte((byte)PacketType.CreateChannel);
+            memoryStream.WriteString(name);
             lock (sendingLock)
             {
-                networkStream.WriteByte((byte)PacketType.CreateChannel);
-                networkStream.WriteString(name);
+                networkStream.Write(memoryStream.ToArray());
                 networkStream.Flush();
-                channels.Add(name);
-                if (ChannelCreated != null)
-                {
-                    ChannelCreated(new(GetChannel(name), this));
-                }
-                return GetChannel(name);
             }
+            channels.Add(name);
+            if (ChannelCreated != null)
+            {
+                ChannelCreated(new(GetChannel(name), this));
+            }
+            return GetChannel(name);
         }
 
         public void DestroyChannel(string name)
         {
             CheckDisposed();
-            if (channels.Contains(name))
+            if (!channels.Contains(name))
             {
-                lock (sendingLock)
-                {
-                    networkStream.WriteByte((byte)PacketType.DestroyChannel);
-                    channels.Remove(name);
-                    networkStream.Flush();
-                }
-                if (ChannelDeleted != null)
-                {
-                    ChannelDeleted(new(name, this));
-                }
+                throw new InvalidOperationException();
+            }
+            using MemoryStream memoryStream = new MemoryStream();
+            memoryStream.WriteByte((byte)PacketType.DestroyChannel);
+            memoryStream.WriteString(name);
+            lock (sendingLock)
+            {
+                networkStream.Write(memoryStream.ToArray());
+                networkStream.Flush();
+            }
+            channels.Remove(name);
+            if (ChannelDeleted != null)
+            {
+                ChannelDeleted(new(name, this));
             }
         }
 
