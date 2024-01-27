@@ -4,53 +4,52 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork
+namespace BlessingStudio.WonderNetwork;
+
+public class SimpleHandler : IHandler
 {
-    public class SimpleHandler : IHandler
+    public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
+    public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
+    public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
+    public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
+    public event Events.EventHandler<DisposedEvent>? Disposed;
+    public void OnChannelCreated(ChannelCreatedEvent @event)
     {
-        public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
-        public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
-        public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
-        public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
-        public event Events.EventHandler<DisposedEvent>? Disposed;
-        public void OnChannelCreated(ChannelCreatedEvent @event)
+        if(ChannelCreated != null)
         {
-            if(ChannelCreated != null)
-            {
-                ChannelCreated(@event);
-            }
+            ChannelCreated(@event);
         }
+    }
 
-        public void OnChannelDeleted(ChannelDeletedEvent @event)
+    public void OnChannelDeleted(ChannelDeletedEvent @event)
+    {
+        if (ChannelDeleted != null)
         {
-            if (ChannelDeleted != null)
-            {
-                ChannelDeleted(@event);
-            }
+            ChannelDeleted(@event);
         }
+    }
 
-        public void OnDisposed(DisposedEvent @event)
+    public void OnDisposed(DisposedEvent @event)
+    {
+        if (Disposed != null)
         {
-            if (Disposed != null)
-            {
-                Disposed(@event);
-            }
+            Disposed(@event);
         }
+    }
 
-        public void OnReceivedBytes(ReceivedBytesEvent @event)
+    public void OnReceivedBytes(ReceivedBytesEvent @event)
+    {
+        if (ReceivedBytes != null)
         {
-            if (ReceivedBytes != null)
-            {
-                ReceivedBytes(@event);
-            }
+            ReceivedBytes(@event);
         }
+    }
 
-        public void OnReceivedObject(ReceivedObjectEvent @event)
+    public void OnReceivedObject(ReceivedObjectEvent @event)
+    {
+        if (ReceivedObject != null)
         {
-            if (ReceivedObject != null)
-            {
-                ReceivedObject(@event);
-            }
+            ReceivedObject(@event);
         }
     }
 }

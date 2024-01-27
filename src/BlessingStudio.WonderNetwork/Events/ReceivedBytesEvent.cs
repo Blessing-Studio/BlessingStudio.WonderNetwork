@@ -3,18 +3,17 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Events
+namespace BlessingStudio.WonderNetwork.Events;
+
+public sealed class ReceivedBytesEvent : IEvent
 {
-    public class ReceivedBytesEvent : IEvent
+    public Channel Channel { get; private set; }
+    public IConnection Connection { get; private set; }
+    public byte[] Data { get; private set; }
+    public ReceivedBytesEvent(Channel channel, IConnection connection, byte[] data)
     {
-        public Channel Channel { get; private set; }
-        public IConnection Connection { get; private set; }
-        public byte[] Data { get; private set; }
-        public ReceivedBytesEvent(Channel channel, IConnection connection, byte[] data)
-        {
-            Channel = channel;
-            Connection = connection;
-            Data = data;
-        }
+        Channel = channel;
+        Connection = connection;
+        Data = data;
     }
 }

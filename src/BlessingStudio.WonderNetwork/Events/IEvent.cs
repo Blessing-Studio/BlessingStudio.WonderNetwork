@@ -2,13 +2,12 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Events
+namespace BlessingStudio.WonderNetwork.Events;
+
+public interface IEvent
 {
-    public interface IEvent
+    public string GetEventName()
     {
-        public string GetEventName()
-        {
-            return GetType().Name;
-        }
+        return GetType().Name;
     }
 }

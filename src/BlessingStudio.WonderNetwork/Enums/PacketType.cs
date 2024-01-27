@@ -2,14 +2,13 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Enums
+namespace BlessingStudio.WonderNetwork.Enums;
+
+public enum PacketType
 {
-    public enum PacketType
-    {
-        CreateChannel,
-        DestroyChannel,
-        SendChannelByteData,
-        SendChannelObjectData,
-        Meaningless
-    }
+    CreateChannel,
+    DestroyChannel,
+    SendChannelByteData,
+    SendChannelObjectData,
+    Meaningless
 }

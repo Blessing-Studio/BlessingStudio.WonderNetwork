@@ -3,16 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Events
+namespace BlessingStudio.WonderNetwork.Events;
+
+public sealed class ChannelCreatedEvent : IEvent
 {
-    public class ChannelCreatedEvent : IEvent
+    public Channel Channel { get; private set; }
+    public IConnection Connection { get; private set; }
+    public ChannelCreatedEvent(Channel channel, IConnection connection)
     {
-        public Channel Channel { get; private set; }
-        public IConnection Connection { get; private set; }
-        public ChannelCreatedEvent(Channel channel, IConnection connection)
-        {
-            Channel = channel;
-            Connection = connection;
-        }
+        Channel = channel;
+        Connection = connection;
     }
 }

@@ -4,33 +4,32 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Utils
+namespace BlessingStudio.WonderNetwork.Utils;
+
+public static class ReflectionUtils
 {
-    public static class ReflectionUtils
+    public static object Deserilize(Type type, ISerializer serilizer, byte[] data)
     {
-        public static object Deserilize(Type type, ISerializer serilizer, byte[] data)
+        Type serilizerType = serilizer.GetType();
+        Type interfaceType = serilizerType.GetInterfaces().FirstOrDefault(t =>
         {
-            Type serilizerType = serilizer.GetType();
-            Type interfaceType = serilizerType.GetInterfaces().FirstOrDefault(t =>
+            return t.GetGenericTypeDefinition() == typeof(ISerializer<>);
+        });
+        if (interfaceType.GenericTypeArguments.Length == 1)
+        {
+            Type genericType = interfaceType.GenericTypeArguments[0];
+            if(type == genericType || type.IsSubclassOf(genericType) || type.GetInterfaces().Contains(genericType))
             {
-                return t.GetGenericTypeDefinition() == typeof(ISerializer<>);
-            });
-            if (interfaceType.GenericTypeArguments.Length == 1)
-            {
-                Type genericType = interfaceType.GenericTypeArguments[0];
-                if(type == genericType || type.IsSubclassOf(genericType) || type.GetInterfaces().Contains(genericType))
-                {
-                    MethodInfo methodInfo = interfaceType.GetMethod("Deserialize")!;
-                    return methodInfo.Invoke(serilizer, new object[] { data })!;
-                }
-                throw new InvalidOperationException("Type is not the type or subclass in serilize");
+                MethodInfo methodInfo = interfaceType.GetMethod("Deserialize")!;
+                return methodInfo.Invoke(serilizer, new object[] { data })!;
             }
-            throw new InvalidOperationException("Serilizer Error");
+            throw new InvalidOperationException("Type is not the type or subclass in serilize");
         }
-        public static Type? GetType(string name)
-        {
-            var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-            return allAssemblies.Select(assembly => assembly.GetType(name)).FirstOrDefault(assembly => assembly != null);
-        }
+        throw new InvalidOperationException("Serilizer Error");
+    }
+    public static Type? GetType(string name)
+    {
+        var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+        return allAssemblies.Select(assembly => assembly.GetType(name)).FirstOrDefault(assembly => assembly != null);
     }
 }

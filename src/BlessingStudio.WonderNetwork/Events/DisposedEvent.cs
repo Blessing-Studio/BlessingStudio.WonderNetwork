@@ -3,14 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Events
+namespace BlessingStudio.WonderNetwork.Events;
+
+public sealed class DisposedEvent : IEvent
 {
-    public class DisposedEvent : IEvent
+    public IConnection Connection { get; private set; }
+    public DisposedEvent(IConnection connection)
     {
-        public IConnection Connection { get; private set; }
-        public DisposedEvent(IConnection connection)
-        {
-            Connection = connection;
-        }
+        Connection = connection;
     }
 }

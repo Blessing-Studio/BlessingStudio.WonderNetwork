@@ -11,418 +11,417 @@ using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork
+namespace BlessingStudio.WonderNetwork;
+
+public class Connection : IConnection, IEnumerable<Channel>
 {
-    public class Connection : IConnection, IEnumerable<Channel>
+    private Stream networkStream;
+    private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
+    public object sendingLock = new object();
+    private List<string> channels = new List<string>();
+    public Dictionary<Type, ISerializer> Serializers { get; private set; } = new();
+    public bool IsDisposed { get; private set; }
+    public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
+    public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
+    public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
+    public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
+    public event Events.EventHandler<DisposedEvent>? Disposed;
+    public List<IHandler> Handlers { get; } = new List<IHandler>();
+    public Connection(Stream networkStream)
     {
-        private Stream networkStream;
-        private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
-        public object sendingLock = new object();
-        private List<string> channels = new List<string>();
-        public Dictionary<Type, ISerializer> Serializers { get; private set; } = new();
-        public bool IsDisposed { get; private set; }
-        public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
-        public event Events.EventHandler<ReceivedObjectEvent>? ReceivedObject;
-        public event Events.EventHandler<ChannelCreatedEvent>? ChannelCreated;
-        public event Events.EventHandler<ChannelDeletedEvent>? ChannelDeleted;
-        public event Events.EventHandler<DisposedEvent>? Disposed;
-        public List<IHandler> Handlers { get; } = new List<IHandler>();
-        public Connection(Stream networkStream)
+        this.networkStream = networkStream;
+    }
+    public void Send(string channelName, byte[] data)
+    {
+        CheckDisposed();
+        if (channels.Contains(channelName) && data.Length != 0)
         {
-            this.networkStream = networkStream;
-        }
-        public void Send(string channelName, byte[] data)
-        {
-            CheckDisposed();
-            if (channels.Contains(channelName) && data.Length != 0)
+            using MemoryStream memoryStream = new MemoryStream();
+            memoryStream.WriteByte((byte)PacketType.SendChannelByteData);
+            memoryStream.WriteString(channelName);
+            memoryStream.WriteVarInt(data.Length);
+            memoryStream.Write(data);
+            lock (sendingLock)
             {
-                using MemoryStream memoryStream = new MemoryStream();
-                memoryStream.WriteByte((byte)PacketType.SendChannelByteData);
-                memoryStream.WriteString(channelName);
-                memoryStream.WriteVarInt(data.Length);
-                memoryStream.Write(data);
-                lock (sendingLock)
+                networkStream.Write(memoryStream.ToArray());
+                networkStream.Flush();
+            }
+        }
+    }
+    public async Task SendAsync(string channelName, byte[] data)
+    {
+        await Task.Run(() => Send(channelName, data));
+    }
+    public void Send<T>(string channelName, T data)
+    {
+        CheckDisposed();
+        if (!channels.Contains(channelName))
+        {
+            throw new InvalidOperationException();
+        }
+        Type type = typeof(T);
+        ISerializer? serializer = default;
+        if (Serializers.ContainsKey(type))
+        {
+            serializer = Serializers[type];
+        }
+        else
+        {
+            foreach (KeyValuePair<Type, ISerializer> keyValuePair in Serializers)
+            {
+                if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
                 {
-                    networkStream.Write(memoryStream.ToArray());
-                    networkStream.Flush();
+                    serializer = keyValuePair.Value;
+                    break;
                 }
             }
         }
-        public async Task SendAsync(string channelName, byte[] data)
+        if (serializer == null)
         {
-            await Task.Run(() => Send(channelName, data));
+            throw new InvalidOperationException("Serilizer Not Found");
         }
-        public void Send<T>(string channelName, T data)
+        MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
+        byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
+        using MemoryStream memoryStream = new MemoryStream();
+        memoryStream.WriteByte((byte)PacketType.SendChannelObjectData);
+        memoryStream.WriteString(channelName);
+        memoryStream.WriteString(type.FullName!);
+        memoryStream.WriteVarInt(buffer.Length);
+        memoryStream.Write(buffer);
+        lock (sendingLock)
         {
-            CheckDisposed();
-            if (!channels.Contains(channelName))
+            networkStream.Write(memoryStream.ToArray());
+            networkStream.Flush();
+        }
+    }
+    public T? WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
+    {
+        CheckDisposed();
+        if (!channels.Contains(channelName))
+        {
+            throw new InvalidOperationException();
+        }
+        T? result = default;
+        SimpleHandler handler = new SimpleHandler();
+        handler.ReceivedObject += a;
+        void a(ReceivedObjectEvent @event)
+        {
+            if (result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
             {
-                throw new InvalidOperationException();
+                result = (T)@event.Object;
             }
-            Type type = typeof(T);
-            ISerializer? serializer = default;
-            if (Serializers.ContainsKey(type))
+        }
+        AddHandler(handler);
+        while (true)
+        {
+            if (result != null)
             {
-                serializer = Serializers[type];
+                RemoveHandler(handler);
+                return result!;
             }
             else
             {
-                foreach (KeyValuePair<Type, ISerializer> keyValuePair in Serializers)
-                {
-                    if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
-                    {
-                        serializer = keyValuePair.Value;
-                        break;
-                    }
-                }
+                Thread.Sleep(1);
             }
-            if (serializer == null)
-            {
-                throw new InvalidOperationException("Serilizer Not Found");
-            }
-            MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
-            byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
-            using MemoryStream memoryStream = new MemoryStream();
-            memoryStream.WriteByte((byte)PacketType.SendChannelObjectData);
-            memoryStream.WriteString(channelName);
-            memoryStream.WriteString(type.FullName!);
-            memoryStream.WriteVarInt(buffer.Length);
-            memoryStream.Write(buffer);
-            lock (sendingLock)
-            {
-                networkStream.Write(memoryStream.ToArray());
-                networkStream.Flush();
-            }
+            if (cancellationToken.IsCancellationRequested) return result;
         }
-        public T? WaitFor<T>(string channelName, CancellationToken cancellationToken = default)
+    }
+    public T? WaitFor<T>(string channelName, TimeSpan timeout)
+    {
+        CheckDisposed();
+        if (!channels.Contains(channelName))
         {
-            CheckDisposed();
-            if (!channels.Contains(channelName))
-            {
-                throw new InvalidOperationException();
-            }
-            T? result = default;
-            SimpleHandler handler = new SimpleHandler();
-            handler.ReceivedObject += a;
-            void a(ReceivedObjectEvent @event)
-            {
-                if (result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
-                {
-                    result = (T)@event.Object;
-                }
-            }
-            AddHandler(handler);
-            while (true)
-            {
-                if (result != null)
-                {
-                    RemoveHandler(handler);
-                    return result!;
-                }
-                else
-                {
-                    Thread.Sleep(1);
-                }
-                if (cancellationToken.IsCancellationRequested) return result;
-            }
+            throw new InvalidOperationException();
         }
-        public T? WaitFor<T>(string channelName, TimeSpan timeout)
+        T? result = default;
+        ThreadUtils.Run((c) =>
         {
-            CheckDisposed();
-            if (!channels.Contains(channelName))
-            {
-                throw new InvalidOperationException();
-            }
-            T? result = default;
-            ThreadUtils.Run((c) =>
-            {
-                result = WaitFor<T>(channelName, c);
-            }, timeout);
-            return result;
-        }
-        public Channel CreateChannel(string name)
+            result = WaitFor<T>(channelName, c);
+        }, timeout);
+        return result;
+    }
+    public Channel CreateChannel(string name)
+    {
+        CheckDisposed();
+        if (channels.Contains(name))
         {
-            CheckDisposed();
-            if (channels.Contains(name))
-            {
-                return GetChannel(name);
-            }
-            using MemoryStream memoryStream = new MemoryStream();
-            memoryStream.WriteByte((byte)PacketType.CreateChannel);
-            memoryStream.WriteString(name);
-            lock (sendingLock)
-            {
-                networkStream.Write(memoryStream.ToArray());
-                networkStream.Flush();
-            }
-            channels.Add(name);
-            if (ChannelCreated != null)
-            {
-                ChannelCreated(new(GetChannel(name), this));
-            }
             return GetChannel(name);
         }
-
-        public void DestroyChannel(string name)
+        using MemoryStream memoryStream = new MemoryStream();
+        memoryStream.WriteByte((byte)PacketType.CreateChannel);
+        memoryStream.WriteString(name);
+        lock (sendingLock)
         {
-            CheckDisposed();
-            if (!channels.Contains(name))
-            {
-                throw new InvalidOperationException();
-            }
-            using MemoryStream memoryStream = new MemoryStream();
-            memoryStream.WriteByte((byte)PacketType.DestroyChannel);
-            memoryStream.WriteString(name);
-            lock (sendingLock)
-            {
-                networkStream.Write(memoryStream.ToArray());
-                networkStream.Flush();
-            }
-            channels.Remove(name);
-            if (ChannelDeleted != null)
-            {
-                ChannelDeleted(new(name, this));
-            }
+            networkStream.Write(memoryStream.ToArray());
+            networkStream.Flush();
         }
-
-        public Channel GetChannel(string name)
+        channels.Add(name);
+        if (ChannelCreated != null)
         {
-            CheckDisposed();
-            if (channels.Contains(name))
-            {
-                return new(this, name);
-            }
-            throw new InvalidOperationException("Not Found");
+            ChannelCreated(new(GetChannel(name), this));
         }
+        return GetChannel(name);
+    }
 
-        public void SendMeaninglessPacket()
+    public void DestroyChannel(string name)
+    {
+        CheckDisposed();
+        if (!channels.Contains(name))
         {
-            CheckDisposed();
-            lock (sendingLock)
-            {
-                networkStream.WriteByte((byte)PacketType.Meaningless);
-                networkStream.Flush();
-            }
+            throw new InvalidOperationException();
         }
+        using MemoryStream memoryStream = new MemoryStream();
+        memoryStream.WriteByte((byte)PacketType.DestroyChannel);
+        memoryStream.WriteString(name);
+        lock (sendingLock)
+        {
+            networkStream.Write(memoryStream.ToArray());
+            networkStream.Flush();
+        }
+        channels.Remove(name);
+        if (ChannelDeleted != null)
+        {
+            ChannelDeleted(new(name, this));
+        }
+    }
 
-        public IReadOnlyList<Channel> GetChannels()
+    public Channel GetChannel(string name)
+    {
+        CheckDisposed();
+        if (channels.Contains(name))
         {
-            CheckDisposed();
-            List<Channel> channels = new List<Channel>();
-            foreach (string channel in this.channels)
-            {
-                channels.Add(GetChannel(channel));
-            }
-            return channels;
+            return new(this, name);
         }
-        public static void Listening(object? arg)
+        throw new InvalidOperationException("Not Found");
+    }
+
+    public void SendMeaninglessPacket()
+    {
+        CheckDisposed();
+        lock (sendingLock)
         {
-            Connection connection = (Connection)arg!;
-            Stream networkStream = connection.networkStream;
-            try
+            networkStream.WriteByte((byte)PacketType.Meaningless);
+            networkStream.Flush();
+        }
+    }
+
+    public IReadOnlyList<Channel> GetChannels()
+    {
+        CheckDisposed();
+        List<Channel> channels = new List<Channel>();
+        foreach (string channel in this.channels)
+        {
+            channels.Add(GetChannel(channel));
+        }
+        return channels;
+    }
+    public static void Listening(object? arg)
+    {
+        Connection connection = (Connection)arg!;
+        Stream networkStream = connection.networkStream;
+        try
+        {
+            while (true)
             {
-                while (true)
+                PacketType packetType = (PacketType)networkStream.ReadByte();
+                connection.CheckDisposed();
+                switch (packetType)
                 {
-                    PacketType packetType = (PacketType)networkStream.ReadByte();
-                    connection.CheckDisposed();
-                    switch (packetType)
-                    {
-                        case PacketType.CreateChannel:
+                    case PacketType.CreateChannel:
+                        {
+                            string name = networkStream.ReadString();
+                            if (!connection.channels.Contains(name))
                             {
-                                string name = networkStream.ReadString();
-                                if (!connection.channels.Contains(name))
+                                connection.channels.Add(name);
+                                ChannelCreatedEvent e = new(connection.GetChannel(name), connection);
+                                if (connection.ChannelCreated != null)
                                 {
-                                    connection.channels.Add(name);
-                                    ChannelCreatedEvent e = new(connection.GetChannel(name), connection);
-                                    if (connection.ChannelCreated != null)
+                                    connection.ChannelCreated(e);
+                                }
+                                connection.CallEventToHandlers(e);
+                            }
+                        }
+                        break;
+                    case PacketType.DestroyChannel:
+                        {
+                            string name = networkStream.ReadString();
+                            if (connection.channels.Contains(name))
+                            {
+                                connection.channels.Remove(name);
+                                ChannelDeletedEvent e = new(name, connection);
+                                if (connection.ChannelDeleted != null)
+                                {
+                                    connection.ChannelDeleted(e);
+                                }
+                                connection.CallEventToHandlers(e);
+                            }
+                        }
+                        break;
+                    case PacketType.SendChannelByteData:
+                        {
+                            string name = networkStream.ReadString();
+                            int length = networkStream.ReadVarInt();
+                            byte[] data = new byte[length];
+                            networkStream.Read(data);
+                            if (connection.channels.Contains(name))
+                            {
+                                Channel channel = connection.GetChannel(name);
+                                ReceivedBytesEvent @event = new(channel, connection, data);
+                                if (connection.ReceivedBytes != null)
+                                {
+                                    connection.ReceivedBytes(@event);
+                                }
+                                connection.CallEventToHandlers(@event);
+                            }
+                        }
+                        break;
+                    case PacketType.SendChannelObjectData:
+                        {
+                            string name = networkStream.ReadString();
+                            string typeName = networkStream.ReadString();
+                            int length = networkStream.ReadVarInt();
+                            byte[] data = new byte[length];
+                            networkStream.Read(data);
+                            Type? type = ReflectionUtils.GetType(typeName);
+                            if (type == null)
+                            {
+                                break;
+                            }
+                            ISerializer? serilizer = default;
+                            if (connection.Serializers.ContainsKey(type))
+                            {
+                                serilizer = connection.Serializers[type];
+                            }
+                            else
+                            {
+                                foreach (KeyValuePair<Type, ISerializer> keyValuePair in connection.Serializers)
+                                {
+                                    if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
                                     {
-                                        connection.ChannelCreated(e);
+                                        serilizer = keyValuePair.Value;
+                                        break;
                                     }
-                                    connection.CallEventToHandlers(e);
                                 }
                             }
-                            break;
-                        case PacketType.DestroyChannel:
+                            if (serilizer == null)
                             {
-                                string name = networkStream.ReadString();
-                                if (connection.channels.Contains(name))
-                                {
-                                    connection.channels.Remove(name);
-                                    ChannelDeletedEvent e = new(name, connection);
-                                    if (connection.ChannelDeleted != null)
-                                    {
-                                        connection.ChannelDeleted(e);
-                                    }
-                                    connection.CallEventToHandlers(e);
-                                }
+                                break;
                             }
-                            break;
-                        case PacketType.SendChannelByteData:
+                            object @object = ReflectionUtils.Deserilize(type, serilizer, data);
+                            if (connection.channels.Contains(name))
                             {
-                                string name = networkStream.ReadString();
-                                int length = networkStream.ReadVarInt();
-                                byte[] data = new byte[length];
-                                networkStream.Read(data);
-                                if (connection.channels.Contains(name))
+                                Channel channel = connection.GetChannel(name);
+                                ReceivedObjectEvent e = new(channel, connection, @object);
+                                if (connection.ReceivedObject != null)
                                 {
-                                    Channel channel = connection.GetChannel(name);
-                                    ReceivedBytesEvent @event = new(channel, connection, data);
-                                    if (connection.ReceivedBytes != null)
-                                    {
-                                        connection.ReceivedBytes(@event);
-                                    }
-                                    connection.CallEventToHandlers(@event);
+                                    connection.ReceivedObject(e);
                                 }
+                                connection.CallEventToHandlers(e);
                             }
-                            break;
-                        case PacketType.SendChannelObjectData:
-                            {
-                                string name = networkStream.ReadString();
-                                string typeName = networkStream.ReadString();
-                                int length = networkStream.ReadVarInt();
-                                byte[] data = new byte[length];
-                                networkStream.Read(data);
-                                Type? type = ReflectionUtils.GetType(typeName);
-                                if (type == null)
-                                {
-                                    break;
-                                }
-                                ISerializer? serilizer = default;
-                                if (connection.Serializers.ContainsKey(type))
-                                {
-                                    serilizer = connection.Serializers[type];
-                                }
-                                else
-                                {
-                                    foreach (KeyValuePair<Type, ISerializer> keyValuePair in connection.Serializers)
-                                    {
-                                        if (type.IsSubclassOf(keyValuePair.Key) || type.GetInterfaces().Contains(keyValuePair.Key))
-                                        {
-                                            serilizer = keyValuePair.Value;
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (serilizer == null)
-                                {
-                                    break;
-                                }
-                                object @object = ReflectionUtils.Deserilize(type, serilizer, data);
-                                if (connection.channels.Contains(name))
-                                {
-                                    Channel channel = connection.GetChannel(name);
-                                    ReceivedObjectEvent e = new(channel, connection, @object);
-                                    if (connection.ReceivedObject != null)
-                                    {
-                                        connection.ReceivedObject(e);
-                                    }
-                                    connection.CallEventToHandlers(e);
-                                }
-                            }
-                            break;
-                        default: break;
-                    }
+                        }
+                        break;
+                    default: break;
                 }
             }
-            catch (Exception ex)
+        }
+        catch (Exception ex)
+        {
+            connection.Dispose();
+        }
+    }
+    public void Start()
+    {
+        if (ReceivingThread.ThreadState == ThreadState.Unstarted ||
+            ReceivingThread.ThreadState == ThreadState.Stopped ||
+            ReceivingThread.ThreadState == ThreadState.Aborted
+            )
+            ReceivingThread.Start(this);
+    }
+    public void Dispose()
+    {
+        networkStream.Dispose();
+        IsDisposed = true;
+        if (Disposed != null)
+        {
+            Disposed(new(this));
+        }
+    }
+    private void CheckDisposed()
+    {
+        if (IsDisposed)
+        {
+            throw new ObjectDisposedException(GetType().FullName);
+        }
+    }
+
+    public IEnumerator<Channel> GetEnumerator()
+    {
+        return GetChannels().GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetChannels().GetEnumerator();
+    }
+
+    public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler)
+    {
+        ReceivedBytes += handler;
+    }
+
+    public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler)
+    {
+        ReceivedObject += handler;
+    }
+
+    public void AddHandler(Events.EventHandler<DisposedEvent> handler)
+    {
+        Disposed += handler;
+    }
+
+    public void AddHandler(Events.EventHandler<ChannelCreatedEvent> handler)
+    {
+        ChannelCreated += handler;
+    }
+
+    public void AddHandler(Events.EventHandler<ChannelDeletedEvent> handler)
+    {
+        ChannelDeleted += handler;
+    }
+
+    public void AddHandler(IHandler handler)
+    {
+        Handlers.Add(handler);
+    }
+
+    public void RemoveHandler(IHandler handler)
+    {
+        Handlers.Remove(handler);
+    }
+
+    private void CallEventToHandlers(IEvent @event)
+    {
+        foreach (IHandler handler in Handlers)
+        {
+            if (@event is ReceivedBytesEvent)
             {
-                connection.Dispose();
+                handler.OnReceivedBytes((ReceivedBytesEvent)@event);
             }
-        }
-        public void Start()
-        {
-            if (ReceivingThread.ThreadState == ThreadState.Unstarted ||
-                ReceivingThread.ThreadState == ThreadState.Stopped ||
-                ReceivingThread.ThreadState == ThreadState.Aborted
-                )
-                ReceivingThread.Start(this);
-        }
-        public void Dispose()
-        {
-            networkStream.Dispose();
-            IsDisposed = true;
-            if (Disposed != null)
+            if (@event is ReceivedObjectEvent)
             {
-                Disposed(new(this));
+                handler.OnReceivedObject((ReceivedObjectEvent)@event);
             }
-        }
-        private void CheckDisposed()
-        {
-            if (IsDisposed)
+            if (@event is DisposedEvent)
             {
-                throw new ObjectDisposedException(GetType().FullName);
+                handler.OnDisposed((DisposedEvent)@event);
             }
-        }
-
-        public IEnumerator<Channel> GetEnumerator()
-        {
-            return GetChannels().GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetChannels().GetEnumerator();
-        }
-
-        public void AddHandler(Events.EventHandler<ReceivedBytesEvent> handler)
-        {
-            ReceivedBytes += handler;
-        }
-
-        public void AddHandler(Events.EventHandler<ReceivedObjectEvent> handler)
-        {
-            ReceivedObject += handler;
-        }
-
-        public void AddHandler(Events.EventHandler<DisposedEvent> handler)
-        {
-            Disposed += handler;
-        }
-
-        public void AddHandler(Events.EventHandler<ChannelCreatedEvent> handler)
-        {
-            ChannelCreated += handler;
-        }
-
-        public void AddHandler(Events.EventHandler<ChannelDeletedEvent> handler)
-        {
-            ChannelDeleted += handler;
-        }
-
-        public void AddHandler(IHandler handler)
-        {
-            Handlers.Add(handler);
-        }
-
-        public void RemoveHandler(IHandler handler)
-        {
-            Handlers.Remove(handler);
-        }
-
-        private void CallEventToHandlers(IEvent @event)
-        {
-            foreach (IHandler handler in Handlers)
+            if (@event is ChannelCreatedEvent)
             {
-                if (@event is ReceivedBytesEvent)
-                {
-                    handler.OnReceivedBytes((ReceivedBytesEvent)@event);
-                }
-                if (@event is ReceivedObjectEvent)
-                {
-                    handler.OnReceivedObject((ReceivedObjectEvent)@event);
-                }
-                if (@event is DisposedEvent)
-                {
-                    handler.OnDisposed((DisposedEvent)@event);
-                }
-                if (@event is ChannelCreatedEvent)
-                {
-                    handler.OnChannelCreated((ChannelCreatedEvent)@event);
-                }
-                if (@event is ChannelDeletedEvent)
-                {
-                    handler.OnChannelDeleted((ChannelDeletedEvent)@event);
-                }
+                handler.OnChannelCreated((ChannelCreatedEvent)@event);
+            }
+            if (@event is ChannelDeletedEvent)
+            {
+                handler.OnChannelDeleted((ChannelDeletedEvent)@event);
             }
         }
     }

@@ -3,14 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BlessingStudio.WonderNetwork.Interfaces
+namespace BlessingStudio.WonderNetwork.Interfaces;
+
+public interface IHandler
 {
-    public interface IHandler
-    {
-        public void OnReceivedBytes(ReceivedBytesEvent @event);
-        public void OnReceivedObject(ReceivedObjectEvent @event);
-        public void OnChannelCreated(ChannelCreatedEvent @event);
-        public void OnChannelDeleted(ChannelDeletedEvent @event);
-        public void OnDisposed(DisposedEvent @event);
-    }
+    public void OnReceivedBytes(ReceivedBytesEvent @event);
+    public void OnReceivedObject(ReceivedObjectEvent @event);
+    public void OnChannelCreated(ChannelCreatedEvent @event);
+    public void OnChannelDeleted(ChannelDeletedEvent @event);
+    public void OnDisposed(DisposedEvent @event);
 }
