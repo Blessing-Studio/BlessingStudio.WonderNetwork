@@ -1,8 +1,5 @@
 ﻿using BlessingStudio.WonderNetwork.Interfaces;
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
 namespace BlessingStudio.WonderNetwork.Utils;
 
@@ -18,7 +15,7 @@ public static class ReflectionUtils
         if (interfaceType.GenericTypeArguments.Length == 1)
         {
             Type genericType = interfaceType.GenericTypeArguments[0];
-            if(type == genericType || type.IsSubclassOf(genericType) || type.GetInterfaces().Contains(genericType))
+            if (type == genericType || type.IsSubclassOf(genericType) || type.GetInterfaces().Contains(genericType))
             {
                 MethodInfo methodInfo = interfaceType.GetMethod("Deserialize")!;
                 return methodInfo.Invoke(serilizer, new object[] { data })!;

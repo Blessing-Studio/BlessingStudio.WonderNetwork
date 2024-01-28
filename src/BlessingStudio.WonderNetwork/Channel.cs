@@ -1,10 +1,5 @@
 ﻿using BlessingStudio.WonderNetwork.Events;
 using BlessingStudio.WonderNetwork.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Data.Common;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace BlessingStudio.WonderNetwork;
 
@@ -22,7 +17,7 @@ public class Channel
     }
     public override bool Equals(object? obj)
     {
-        if(obj is Channel other)
+        if (obj is Channel other)
         {
             return this == other;
         }
@@ -49,7 +44,7 @@ public class Channel
     {
         Connection.AddHandler((ReceivedBytesEvent e) =>
         {
-            if(e.Channel == this)
+            if (e.Channel == this)
             {
                 handler(e);
             }

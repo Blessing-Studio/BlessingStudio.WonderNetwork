@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace BlessingStudio.WonderNetwork.Utils;
+﻿namespace BlessingStudio.WonderNetwork.Utils;
 
 public static class BufferUtils
 {
@@ -12,7 +8,7 @@ public static class BufferUtils
     }
     public static void ValidateBufferArguments(byte[] buffer, int offset, int count)
     {
-        if(!CheckBufferArgs(buffer, offset, count))
+        if (!CheckBufferArgs(buffer, offset, count))
         {
             throw new ArgumentException();
         }

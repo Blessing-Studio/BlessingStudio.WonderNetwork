@@ -1,6 +1,4 @@
 ﻿using BlessingStudio.WonderNetwork.Utils;
-using System.Drawing;
-using System;
 using System.Net;
 using System.Net.Sockets;
 
@@ -8,7 +6,9 @@ namespace BlessingStudio.WonderNetwork;
 
 public partial class UDPNetworkStream : Stream, IDisposable
 {
-    public bool IsConnected { get
+    public bool IsConnected
+    {
+        get
         {
             return Socket.Connected;
         }
@@ -67,7 +67,7 @@ public partial class UDPNetworkStream : Stream, IDisposable
         {
             if (this.r_buffer.Count >= count)
             {
-                for(int i = 0; i < count;i++)
+                for (int i = 0; i < count; i++)
                 {
                     buffer[i + offset] = this.r_buffer.Dequeue();
                 }
@@ -108,7 +108,7 @@ public partial class UDPNetworkStream : Stream, IDisposable
     {
         this.Socket = socket;
         this.IPEndPoint = iPEndPoint;
-        if(socket.ProtocolType != ProtocolType.Udp)
+        if (socket.ProtocolType != ProtocolType.Udp)
         {
             throw new ArgumentException();
         }
@@ -131,7 +131,7 @@ public partial class UDPNetworkStream : Stream, IDisposable
     }
     public void OnReceive(byte[] data)
     {
-        foreach(byte b in data)
+        foreach (byte b in data)
         {
             r_buffer.Enqueue(b);
         }

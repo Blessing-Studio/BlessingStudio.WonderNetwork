@@ -1,9 +1,6 @@
 ﻿using BlessingStudio.WonderNetwork.Events;
-using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 
 namespace BlessingStudio.WonderNetwork.Threading;
 
@@ -11,13 +8,13 @@ public class UDPReceiver
 {
     public static int DefaultThreadCount = 4;
     public event Events.EventHandler<NewUDPConnectionEvent>? NewUDPConnection;
-    private List<Thread> threads = new List<Thread>();
+    private readonly List<Thread> threads = new();
     private Dictionary<Thread, CancellationTokenSource> cancellationTokens = new();
-    private object threadLock = new object();
+    private readonly object threadLock = new();
     private int reducingReadyed = 0;
     private object threadCountChangingLock = new();
-    public int ThreadCount {  get { return threads.Count; } }
-    public int buffersize { get; set; } = 4 * 1024;
+    public int ThreadCount { get { return threads.Count; } }
+    public int Buffersize { get; set; } = 4 * 1024;
     public Dictionary<IPEndPoint, UDPNetworkStream> NetworkStreams { get; private set; } = new();
     public bool ThreadCountReducing { get; private set; } = false;
     public Socket Socket { get; private set; }
@@ -28,8 +25,8 @@ public class UDPReceiver
         for (int i = 0; i < DefaultThreadCount; i++)
         {
             Thread thread = new(ReceivingThread);
-            CancellationTokenSource token = new CancellationTokenSource();
-            thread.Start(new object[] {this, token.Token});
+            CancellationTokenSource token = new();
+            thread.Start(new object[] { this, token.Token });
             threads.Add(thread);
             cancellationTokens[thread] = token;
             thread.Name = "WonderNetoworkThread";
@@ -62,10 +59,10 @@ public class UDPReceiver
             }
             else if (count < ThreadCount)
             {
-                while(ThreadCount == count)
+                while (ThreadCount == count)
                 {
                     Thread thread = new(ReceivingThread);
-                    CancellationTokenSource token = new CancellationTokenSource();
+                    CancellationTokenSource token = new();
                     thread.Start(new object[] { this, token.Token });
                     threads.Add(thread);
                     cancellationTokens[thread] = token;
@@ -76,11 +73,11 @@ public class UDPReceiver
     }
     private static void ReceivingThread(object? arg)
     {
-        UDPReceiver receiver = (UDPReceiver)((object[])arg)[0]!;
+        UDPReceiver receiver = (UDPReceiver)((object[])arg!)[0]!;
         CancellationToken cancellationToken = (CancellationToken)((object[])arg)[1]!;
         while (true)
         {
-            if(receiver.ThreadCountReducing)
+            if (receiver.ThreadCountReducing)
             {
                 receiver.reducingReadyed++;
                 while (receiver.ThreadCountReducing)
@@ -89,9 +86,9 @@ public class UDPReceiver
                     Thread.Sleep(10);
                 }
             }
-            EndPoint endPoint = new IPEndPoint(new IPAddress(new byte[] {127, 0, 0, 1}), 1);
-            byte[] bytes = new byte[receiver.buffersize];
-            int count = 0;
+            EndPoint endPoint = new IPEndPoint(new IPAddress(new byte[] { 127, 0, 0, 1 }), 1);
+            byte[] bytes = new byte[receiver.Buffersize];
+            int count;
             try
             {
                 count = receiver.Socket.ReceiveFrom(bytes, ref endPoint);
@@ -115,10 +112,7 @@ public class UDPReceiver
                 else
                 {
                     receiver.NetworkStreams[iPEndPoint] = new(receiver.Socket, iPEndPoint);
-                    if(receiver.NewUDPConnection != null)
-                    {
-                        receiver.NewUDPConnection(new(iPEndPoint, receiver.Socket));
-                    }
+                    receiver.NewUDPConnection?.Invoke(new(iPEndPoint, receiver.Socket));
                     receiver.NetworkStreams[iPEndPoint].OnReceive(buffer);
                 }
             }

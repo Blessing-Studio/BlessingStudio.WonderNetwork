@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace BlessingStudio.WonderNetwork.Events;
+﻿namespace BlessingStudio.WonderNetwork.Events;
 
 public interface IEvent
 {
