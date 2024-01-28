@@ -15,10 +15,10 @@ namespace BlessingStudio.WonderNetwork;
 
 public class Connection : IConnection, IEnumerable<Channel>
 {
-    private Stream networkStream;
-    private Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
-    public object sendingLock = new object();
-    private List<string> channels = new List<string>();
+    private readonly Stream networkStream;
+    private readonly Thread ReceivingThread = new(new ParameterizedThreadStart(Listening));
+    public object sendingLock = new();
+    private readonly List<string> channels = new();
     public Dictionary<Type, ISerializer> Serializers { get; private set; } = new();
     public bool IsDisposed { get; private set; }
     public event Events.EventHandler<ReceivedBytesEvent>? ReceivedBytes;
@@ -36,7 +36,7 @@ public class Connection : IConnection, IEnumerable<Channel>
         CheckDisposed();
         if (channels.Contains(channelName) && data.Length != 0)
         {
-            using MemoryStream memoryStream = new MemoryStream();
+            using MemoryStream memoryStream = new();
             memoryStream.WriteByte((byte)PacketType.SendChannelByteData);
             memoryStream.WriteString(channelName);
             memoryStream.WriteVarInt(data.Length);
@@ -82,7 +82,7 @@ public class Connection : IConnection, IEnumerable<Channel>
         }
         MethodInfo methodInfo = serializer.GetType().GetMethod("Serialize")!;
         byte[] buffer = (byte[])methodInfo.Invoke(serializer, new object[] { data! })!;
-        using MemoryStream memoryStream = new MemoryStream();
+        using MemoryStream memoryStream = new();
         memoryStream.WriteByte((byte)PacketType.SendChannelObjectData);
         memoryStream.WriteString(channelName);
         memoryStream.WriteString(type.FullName!);
@@ -102,13 +102,13 @@ public class Connection : IConnection, IEnumerable<Channel>
             throw new InvalidOperationException();
         }
         T? result = default;
-        SimpleHandler handler = new SimpleHandler();
+        SimpleHandler handler = new();
         handler.ReceivedObject += a;
         void a(ReceivedObjectEvent @event)
         {
-            if (result == null && @event.Channel.ChannelName == channelName && @event.Object is T)
+            if (result == null && @event.Channel.ChannelName == channelName && @event.Object is T t)
             {
-                result = (T)@event.Object;
+                result = t;
             }
         }
         AddHandler(handler);
@@ -147,7 +147,7 @@ public class Connection : IConnection, IEnumerable<Channel>
         {
             return GetChannel(name);
         }
-        using MemoryStream memoryStream = new MemoryStream();
+        using MemoryStream memoryStream = new();
         memoryStream.WriteByte((byte)PacketType.CreateChannel);
         memoryStream.WriteString(name);
         lock (sendingLock)
@@ -156,10 +156,7 @@ public class Connection : IConnection, IEnumerable<Channel>
             networkStream.Flush();
         }
         channels.Add(name);
-        if (ChannelCreated != null)
-        {
-            ChannelCreated(new(GetChannel(name), this));
-        }
+        ChannelCreated?.Invoke(new(GetChannel(name), this));
         return GetChannel(name);
     }
 
@@ -170,7 +167,7 @@ public class Connection : IConnection, IEnumerable<Channel>
         {
             throw new InvalidOperationException();
         }
-        using MemoryStream memoryStream = new MemoryStream();
+        using MemoryStream memoryStream = new();
         memoryStream.WriteByte((byte)PacketType.DestroyChannel);
         memoryStream.WriteString(name);
         lock (sendingLock)
@@ -179,10 +176,7 @@ public class Connection : IConnection, IEnumerable<Channel>
             networkStream.Flush();
         }
         channels.Remove(name);
-        if (ChannelDeleted != null)
-        {
-            ChannelDeleted(new(name, this));
-        }
+        ChannelDeleted?.Invoke(new(name, this));
     }
 
     public Channel GetChannel(string name)
@@ -208,7 +202,7 @@ public class Connection : IConnection, IEnumerable<Channel>
     public IReadOnlyList<Channel> GetChannels()
     {
         CheckDisposed();
-        List<Channel> channels = new List<Channel>();
+        List<Channel> channels = new();
         foreach (string channel in this.channels)
         {
             channels.Add(GetChannel(channel));
@@ -234,10 +228,7 @@ public class Connection : IConnection, IEnumerable<Channel>
                             {
                                 connection.channels.Add(name);
                                 ChannelCreatedEvent e = new(connection.GetChannel(name), connection);
-                                if (connection.ChannelCreated != null)
-                                {
-                                    connection.ChannelCreated(e);
-                                }
+                                connection.ChannelCreated?.Invoke(e);
                                 connection.CallEventToHandlers(e);
                             }
                         }
@@ -249,10 +240,7 @@ public class Connection : IConnection, IEnumerable<Channel>
                             {
                                 connection.channels.Remove(name);
                                 ChannelDeletedEvent e = new(name, connection);
-                                if (connection.ChannelDeleted != null)
-                                {
-                                    connection.ChannelDeleted(e);
-                                }
+                                connection.ChannelDeleted?.Invoke(e);
                                 connection.CallEventToHandlers(e);
                             }
                         }
@@ -267,10 +255,7 @@ public class Connection : IConnection, IEnumerable<Channel>
                             {
                                 Channel channel = connection.GetChannel(name);
                                 ReceivedBytesEvent @event = new(channel, connection, data);
-                                if (connection.ReceivedBytes != null)
-                                {
-                                    connection.ReceivedBytes(@event);
-                                }
+                                connection.ReceivedBytes?.Invoke(@event);
                                 connection.CallEventToHandlers(@event);
                             }
                         }
@@ -312,10 +297,7 @@ public class Connection : IConnection, IEnumerable<Channel>
                             {
                                 Channel channel = connection.GetChannel(name);
                                 ReceivedObjectEvent e = new(channel, connection, @object);
-                                if (connection.ReceivedObject != null)
-                                {
-                                    connection.ReceivedObject(e);
-                                }
+                                connection.ReceivedObject?.Invoke(e);
                                 connection.CallEventToHandlers(e);
                             }
                         }
@@ -324,7 +306,7 @@ public class Connection : IConnection, IEnumerable<Channel>
                 }
             }
         }
-        catch (Exception ex)
+        catch
         {
             connection.Dispose();
         }
@@ -341,10 +323,7 @@ public class Connection : IConnection, IEnumerable<Channel>
     {
         networkStream.Dispose();
         IsDisposed = true;
-        if (Disposed != null)
-        {
-            Disposed(new(this));
-        }
+        Disposed?.Invoke(new(this));
     }
     private void CheckDisposed()
     {
