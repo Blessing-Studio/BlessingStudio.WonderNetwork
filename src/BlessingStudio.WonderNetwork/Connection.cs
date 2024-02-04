@@ -365,17 +365,20 @@ public class Connection : IConnection, IEnumerable<Channel>
 
     public void AddHandler(IHandler handler)
     {
-        Handlers.Add(handler);
+        lock (Handlers)
+            Handlers.Add(handler);
     }
 
     public void RemoveHandler(IHandler handler)
     {
-        Handlers.Remove(handler);
+        lock (Handlers)
+            Handlers.Remove(handler);
     }
 
     private void CallEventToHandlers(IEvent @event)
     {
-        foreach (IHandler handler in Handlers)
+        lock (Handlers)
+            foreach (IHandler handler in Handlers)
         {
             if (@event is ReceivedBytesEvent)
             {
