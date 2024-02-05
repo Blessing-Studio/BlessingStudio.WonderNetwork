@@ -316,9 +316,13 @@ public class Connection : IConnection, IEnumerable<Channel>
     }
     public void Dispose()
     {
-        networkStream.Dispose();
-        IsDisposed = true;
-        Disposed?.Invoke(new(this));
+        if (!IsDisposed)
+        {
+            IsDisposed = true;
+            networkStream.Dispose();
+            Disposed?.Invoke(new(this));
+            GC.SuppressFinalize(this);
+        }
     }
     private void CheckDisposed()
     {
