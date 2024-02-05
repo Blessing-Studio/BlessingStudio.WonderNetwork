@@ -62,4 +62,9 @@ public class SafeNetworkStream : Stream
     {
         NetworkStream.Write(buffer, offset, count);
     }
+
+    public override void Close()
+    {
+        NetworkStream.Dispose();
+    }
 }
